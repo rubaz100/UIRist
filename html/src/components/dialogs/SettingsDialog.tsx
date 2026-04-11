@@ -85,7 +85,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
               type="text"
               value={localRistServerHost}
               onChange={e => setLocalRistServerHost(e.target.value)}
-              placeholder="e.g. ingest.bro.rs"
+              placeholder="e.g. your-server.example.com"
             />
             <Form.Text className="text-muted">
               Hostname shown in RIST input URLs. Defaults to the RIST API URL hostname if empty.
