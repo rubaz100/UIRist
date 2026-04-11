@@ -10,9 +10,10 @@ interface SetupDialogProps {
 
 export const SetupDialog: React.FC<SetupDialogProps> = ({ open, onClose }) => {
   const { setApiKey } = useAuth();
-  const { ristApiUrl, setRistApiUrl, setRistApiKey } = useSettings();
+  const { ristApiUrl, setRistApiUrl, setRistApiKey, setRistServerHost } = useSettings();
 
   const [localRistUrl, setLocalRistUrl] = useState(ristApiUrl);
+  const [localRistHost, setLocalRistHost] = useState('');
   const [localRistKey, setLocalRistKey] = useState('');
   const [localSrtKey, setLocalSrtKey] = useState('');
   const [showRistKey, setShowRistKey] = useState(false);
@@ -20,6 +21,7 @@ export const SetupDialog: React.FC<SetupDialogProps> = ({ open, onClose }) => {
 
   const handleSave = () => {
     if (localRistUrl.trim()) setRistApiUrl(localRistUrl.trim());
+    if (localRistHost.trim()) setRistServerHost(localRistHost.trim());
     setRistApiKey(localRistKey);
     setApiKey(localSrtKey);
     localStorage.setItem('setup-complete', 'true');
@@ -59,6 +61,22 @@ export const SetupDialog: React.FC<SetupDialogProps> = ({ open, onClose }) => {
             />
             <Form.Text className="text-muted">
               URL of the UIRist API server managing RIST receivers.
+            </Form.Text>
+          </Form.Group>
+
+          <Form.Group className="mb-4">
+            <Form.Label className="fw-semibold">
+              <i className="bi bi-hdd-network me-2 text-info"></i>RIST Server Hostname
+              <span className="text-muted fw-normal ms-2 small">(optional)</span>
+            </Form.Label>
+            <Form.Control
+              type="text"
+              value={localRistHost}
+              onChange={e => setLocalRistHost(e.target.value)}
+              placeholder="e.g. ingest.bro.rs"
+            />
+            <Form.Text className="text-muted">
+              Hostname shown in RIST input URLs. Defaults to the RIST API URL hostname.
             </Form.Text>
           </Form.Group>
 

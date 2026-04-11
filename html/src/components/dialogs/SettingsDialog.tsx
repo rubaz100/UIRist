@@ -12,10 +12,11 @@ interface SettingsDialogProps {
 
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey } = useSettings();
+  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
   const [localRistApiUrl, setLocalRistApiUrl] = useState('');
   const [localRistApiKey, setLocalRistApiKey] = useState('');
+  const [localRistServerHost, setLocalRistServerHost] = useState('');
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
       setLocalApiKey(apiKey || '');
       setLocalRistApiUrl(ristApiUrl);
       setLocalRistApiKey(ristApiKey);
+      setLocalRistServerHost(ristServerHost);
       setSuccess(false);
     }
   }, [open, apiKey, ristApiUrl, ristApiKey]);
@@ -31,6 +33,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
     setApiKey(localApiKey);
     setRistApiUrl(localRistApiUrl);
     setRistApiKey(localRistApiKey);
+    setRistServerHost(localRistServerHost);
     setSuccess(true);
     setTimeout(() => { onClose(); }, 1000);
   };
@@ -73,6 +76,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
             />
             <Form.Text className="text-muted">
               URL of the UIRist API server. Manages ristreceiver processes and flow stats.
+            </Form.Text>
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>RIST Server Hostname</Form.Label>
+            <Form.Control
+              type="text"
+              value={localRistServerHost}
+              onChange={e => setLocalRistServerHost(e.target.value)}
+              placeholder="e.g. ingest.bro.rs"
+            />
+            <Form.Text className="text-muted">
+              Hostname shown in RIST input URLs. Defaults to the RIST API URL hostname if empty.
             </Form.Text>
           </Form.Group>
 

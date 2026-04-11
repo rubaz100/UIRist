@@ -8,6 +8,8 @@ interface SettingsContextType {
   setRistApiUrl: (url: string) => void;
   ristApiKey: string;
   setRistApiKey: (key: string) => void;
+  ristServerHost: string;
+  setRistServerHost: (host: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -15,8 +17,10 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
+  const rawRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
   const [ristApiKey, setRistApiKeyState] = useState<string>('');
+  const [ristServerHost, setRistServerHostState] = useState<string>(rawRistServerHost);
 
   useEffect(() => {
     const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
@@ -27,6 +31,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedRistApiKey = localStorage.getItem('rist-api-key');
     if (savedRistApiKey) setRistApiKeyState(savedRistApiKey);
+
+    const savedRistServerHost = localStorage.getItem('rist-server-host');
+    if (savedRistServerHost) setRistServerHostState(savedRistServerHost);
   }, []);
 
   const setAdvancedMode = (enabled: boolean) => {
@@ -44,11 +51,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     localStorage.setItem('rist-api-key', key);
   };
 
+  const setRistServerHost = (host: string) => {
+    setRistServerHostState(host);
+    localStorage.setItem('rist-server-host', host);
+  };
+
   return (
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
+      ristServerHost, setRistServerHost,
     }}>
       {children}
     </SettingsContext.Provider>

@@ -13,6 +13,8 @@ const config = (() => {
     const SRTLA_PORT = process.env.REACT_APP_SRTLA_PORT || '{{SRTLA_PORT}}';
     // RIST management API URL (uirist api/server.js)
     const RIST_API_URL = process.env.REACT_APP_RIST_API_URL || '{{RIST_API_URL}}';
+    // Hostname shown in RIST input URLs (e.g. ingest.bro.rs) — falls back to RIST_API_URL host
+    const RIST_SERVER_HOST = process.env.REACT_APP_RIST_SERVER_HOST || '{{RIST_SERVER_HOST}}';
 
     return {
         apiEndpoint: API_ENDPOINT,
@@ -20,7 +22,8 @@ const config = (() => {
         srtSenderPort: SRT_SENDER_PORT,
         slsStatsPort: SLS_STATS_PORT,
         srtlaPort: SRTLA_PORT,
-        ristApiUrl: RIST_API_URL
+        ristApiUrl: RIST_API_URL,
+        ristServerHost: RIST_SERVER_HOST,
     };
 })();
 

@@ -13,7 +13,9 @@ import { RefreshTimer } from '../components/ui';
 
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, ristApiKey } = useSettings();
+  const { ristApiUrl, ristApiKey, ristServerHost } = useSettings();
+
+  const resolvedServerHost = ristServerHost || (() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })();
 
   // ── SRT state ──────────────────────────────────────────────────────────────
   const [streamIds, setStreamIds] = useState<StreamId[]>([]);
@@ -146,7 +148,7 @@ export const PublishersPage: React.FC = () => {
                   ) : receivers.length === 0 ? (
                     <p className="text-muted small mb-0">No receivers running. Click Add to start one.</p>
                   ) : (
-                    receivers.map(r => <ReceiverCard key={r.id} receiver={r} serverHost={(() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })()} onDelete={deleteReceiver} />)
+                    receivers.map(r => <ReceiverCard key={r.id} receiver={r} serverHost={resolvedServerHost} onDelete={deleteReceiver} />)
                   )}
                 </div>
               </Collapse>
