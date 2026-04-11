@@ -42,9 +42,16 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
 
   useEffect(() => {
     if (!open) return;
+    setOutputUrl(`udp://${defaultOutputHost}:5001`);
     const timer = setTimeout(() => checkPort(listenPort), 400);
     return () => clearTimeout(timer);
-  }, [listenPort, open, checkPort]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => checkPort(listenPort), 400);
+    return () => clearTimeout(timer);
+  }, [listenPort, checkPort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = () => {
     setName(''); setListenPort('5005'); setOutputUrl(`udp://${defaultOutputHost}:5001`);
