@@ -82,8 +82,12 @@ export const AddStreamDialog: React.FC<AddStreamDialogProps> = ({
         setError(`Stream ID with player '${player}' already exists`);
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
+      } else if (err.response?.data?.error) {
+        setError(`Server error: ${err.response.data.error}`);
+      } else if (err.response?.status) {
+        setError(`HTTP ${err.response.status} – check your SRT API key and APP_URL in settings.`);
       } else {
-        setError('Failed to add stream ID. Please try again.');
+        setError(`Failed to add stream ID: ${err.message}`);
       }
     } finally {
       setLoading(false);

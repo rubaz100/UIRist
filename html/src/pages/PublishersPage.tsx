@@ -6,7 +6,7 @@ import { apiService } from '../services/api.service';
 import { StreamId } from '../types/api.types';
 import { PublisherCard } from '../components/publisher';
 import { RistFlowCard, AddReceiverDialog, ReceiverCard } from '../components/rist';
-import { AddStreamDialog, SettingsDialog } from '../components/dialogs';
+import { SettingsDialog } from '../components/dialogs';
 import { useRistStats } from '../hooks/useRistStats';
 import { useRistReceivers } from '../hooks/useRistReceivers';
 import { RefreshTimer } from '../components/ui';
@@ -97,9 +97,7 @@ export const PublishersPage: React.FC = () => {
   const [streamIds, setStreamIds] = useState<StreamId[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [prefillPublisher, setPrefillPublisher] = useState<string | undefined>(undefined);
 
   // ── RIST state ─────────────────────────────────────────────────────────────
   const srtEnabled = enabledServices.includes('srt');
@@ -140,25 +138,6 @@ export const PublishersPage: React.FC = () => {
   }, [isAuthenticated, srtEnabled]);
 
   useEffect(() => { fetchStreamIds(); }, [isAuthenticated, fetchStreamIds]);
-
-  const handleStreamAdded = (newStreamId: StreamId) => {
-    setStreamIds(prev => [...prev, newStreamId]);
-    setPrefillPublisher(undefined);
-  };
-
-  const handleDeleteStream = async (playerId: string) => {
-    try {
-      await apiService.deleteStreamId(playerId);
-      setStreamIds(prev => prev.filter(s => s.player !== playerId));
-    } catch {
-      setError('Failed to delete stream. Please try again.');
-    }
-  };
-
-  const handleAddPlayer = (publisher: string) => {
-    setPrefillPublisher(publisher);
-    setAddDialogOpen(true);
-  };
 
   const handleCreateReceiver = async (payload: any) => {
     await createReceiver(payload);
@@ -248,13 +227,6 @@ export const PublishersPage: React.FC = () => {
               {!srtEnabled && ristEnabled && 'Monitor and manage RIST flows'}
             </p>
           </Col>
-          {srtEnabled && isAuthenticated && (
-            <Col xs="auto">
-              <Button variant="primary" onClick={() => { setPrefillPublisher(undefined); setAddDialogOpen(true); }} disabled={loading} className="text-nowrap">
-                <i className="bi bi-plus-lg me-2"></i>Add SRT Stream
-              </Button>
-            </Col>
-          )}
         </Row>
 
         <Row className="g-4">
@@ -281,17 +253,15 @@ export const PublishersPage: React.FC = () => {
               ) : streamIds.length === 0 ? (
                 <Card className="text-center">
                   <Card.Body className="py-4">
-                    <h6 className="mb-2">No streams configured</h6>
-                    <p className="text-muted small mb-3">Add your first stream to get started</p>
-                    <Button variant="primary" size="sm" onClick={() => { setPrefillPublisher(undefined); setAddDialogOpen(true); }}>
-                      <i className="bi bi-plus-lg me-2"></i>Add Stream
-                    </Button>
+                    <i className="bi bi-broadcast display-6 mb-2 d-block opacity-50"></i>
+                    <h6 className="mb-2">No active SRT streams</h6>
+                    <p className="text-muted small mb-0">Streams are configured on the server.</p>
                   </Card.Body>
                 </Card>
               ) : (
                 <div>
                   {Object.entries(groupedStreamIds).map(([publisher, ids]) => (
-                    <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} onDelete={handleDeleteStream} onAddPlayer={handleAddPlayer} />
+                    <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} />
                   ))}
                 </div>
               )}
@@ -374,7 +344,6 @@ export const PublishersPage: React.FC = () => {
         </Row>
       </Container>
 
-      <AddStreamDialog open={addDialogOpen} onClose={() => { setAddDialogOpen(false); setPrefillPublisher(undefined); }} onStreamAdded={handleStreamAdded} prefillPublisher={prefillPublisher} />
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
       <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} />
     </>
