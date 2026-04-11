@@ -50,7 +50,8 @@ app.post('/api/receivers', (req, res) => {
 
   try {
     const rec = startReceiver({ name, listenPort, outputUrl });
-    res.status(201).json(rec);
+    const { _proc, ...pub } = rec;
+    res.status(201).json(pub);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
