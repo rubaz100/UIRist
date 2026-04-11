@@ -11,13 +11,16 @@ const config = (() => {
     const SLS_STATS_PORT = process.env.REACT_APP_SLS_STATS_PORT || '{{SLS_STATS_PORT}}';
     // SRTLA_PORT is optional - will be empty if not configured
     const SRTLA_PORT = process.env.REACT_APP_SRTLA_PORT || '{{SRTLA_PORT}}';
+    // RIST metrics endpoint (ristreceiver Prometheus/OpenMetrics URL)
+    const RIST_METRICS_URL = process.env.REACT_APP_RIST_METRICS_URL || '{{RIST_METRICS_URL}}';
 
     return {
         apiEndpoint: API_ENDPOINT,
         srtPlayerPort: SRT_PLAYER_PORT,
         srtSenderPort: SRT_SENDER_PORT,
         slsStatsPort: SLS_STATS_PORT,
-        srtlaPort: SRTLA_PORT
+        srtlaPort: SRTLA_PORT,
+        ristMetricsUrl: RIST_METRICS_URL
     };
 })();
 

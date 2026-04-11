@@ -17,21 +17,24 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   onClose,
 }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode } = useSettings();
+  const { advancedMode, setAdvancedMode, ristMetricsUrl, setRistMetricsUrl } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
+  const [localRistUrl, setLocalRistUrl] = useState('');
   const [success, setSuccess] = useState(false);
 
   // Initialize local state when dialog opens
   useEffect(() => {
     if (open) {
       setLocalApiKey(apiKey || '');
+      setLocalRistUrl(ristMetricsUrl);
       setSuccess(false);
     }
-  }, [open, apiKey]);
+  }, [open, apiKey, ristMetricsUrl]);
 
   // Handle save
   const handleSave = () => {
     setApiKey(localApiKey);
+    setRistMetricsUrl(localRistUrl);
     setSuccess(true);
     setTimeout(() => {
       onClose();
@@ -72,6 +75,20 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             placeholder="Enter your API key"
             helpText="Your SRT Live Server API key for authentication"
           />
+
+          <Form.Group className="mb-3">
+            <Form.Label>RIST Metrics URL</Form.Label>
+            <Form.Control
+              type="text"
+              value={localRistUrl}
+              onChange={e => setLocalRistUrl(e.target.value)}
+              placeholder="http://your-rist-server:9100/metrics"
+            />
+            <Form.Text className="text-muted">
+              Prometheus /metrics endpoint of your ristreceiver instance.
+              Must be CORS-accessible (e.g. via nginx proxy).
+            </Form.Text>
+          </Form.Group>
 
           <hr />
 
