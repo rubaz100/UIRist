@@ -1,5 +1,50 @@
 services:
+  # ── UI (production: nginx + React build) ───────────────────────────────────
   ui:
+    build:
+      context: .
+      dockerfile: docker/production.Dockerfile
+      args:
+        REACT_APP_BASE_URL: "${APP_URL}"
+        REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-4000}"
+        REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-4001}"
+        REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8080}"
+        REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-}"
+        REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
+    ports:
+      - "${UI_PORT:-80}:80"
+    restart: unless-stopped
+    depends_on:
+      rist-api:
+        condition: service_healthy
+
+  # ── RIST API (with librist built-in) ───────────────────────────────────────
+  rist-api:
+    build:
+      context: ./api
+      dockerfile: ../docker/rist-api.Dockerfile
+    ports:
+      - "${RIST_API_PORT:-3001}:3001"
+    environment:
+      RIST_API_PORT: "3001"
+      RIST_API_KEY: "${RIST_API_KEY:-}"
+      CORS_ORIGIN: "${CORS_ORIGIN:-*}"
+      RIST_STATE_FILE: "/app/data/receivers.json"
+      NODE_ENV: "production"
+    volumes:
+      - rist-data:/app/data
+      - rist-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Dev UI (optional, only used with --profile dev) ────────────────────────
+  ui-dev:
+    profiles: ["dev"]
     build:
       context: .
       dockerfile: docker/development.Dockerfile
@@ -10,19 +55,11 @@ services:
       REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-4000}"
       REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-4001}"
       REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8080}"
-      REACT_APP_SRTLA_PORT: "${SRTLA_PORT}"
+      REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-}"
       REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
     ports:
       - "3000:3000"
 
-  rist-api:
-    image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - ./api:/app
-    command: node server.js
-    environment:
-      RIST_API_PORT: "3001"
-      RISTRECEIVER_BIN: "/usr/bin/ristreceiver"
-    ports:
-      - "3001:3001"
+volumes:
+  rist-data:
+  rist-logs:
