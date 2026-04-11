@@ -8,14 +8,15 @@ interface AddReceiverDialogProps {
   onClose: () => void;
   onCreate: (payload: CreateReceiverPayload) => Promise<void>;
   apiKey?: string;
+  defaultOutputHost?: string;
 }
 
 type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'invalid';
 
-export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '' }) => {
+export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '', defaultOutputHost = '127.0.0.1' }) => {
   const [name, setName] = useState('');
   const [listenPort, setListenPort] = useState('5005');
-  const [outputUrl, setOutputUrl] = useState('udp://127.0.0.1:5001');
+  const [outputUrl, setOutputUrl] = useState(`udp://${defaultOutputHost}:5001`);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [portStatus, setPortStatus] = useState<PortStatus>('idle');
@@ -46,7 +47,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
   }, [listenPort, open, checkPort]);
 
   const handleClose = () => {
-    setName(''); setListenPort('5005'); setOutputUrl('udp://127.0.0.1:5001');
+    setName(''); setListenPort('5005'); setOutputUrl(`udp://${defaultOutputHost}:5001`);
     setError(null); setPortStatus('idle');
     onClose();
   };

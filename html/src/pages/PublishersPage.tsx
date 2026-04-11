@@ -221,7 +221,7 @@ export const PublishersPage: React.FC = () => {
 
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
       <SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
-      <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} />
+      <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} defaultOutputHost={resolvedServerHost} />
     </>
   );
 };
