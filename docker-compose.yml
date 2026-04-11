@@ -18,12 +18,7 @@ services:
     build:
       context: ./api
       dockerfile: ../docker/rist-api.Dockerfile
-    ports:
-      - "${RIST_API_PORT:-3001}:3001"
-      - "5005-5020:5005-5020/udp"   # RIST input ports (ristreceiver listens here)
-      - "5001-5004:5001-5004/tcp"   # RIST output ports (SRT listener — VLC/OBS pulls from here)
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # lets ristreceiver forward to host ports (udp://host.docker.internal:5001)
+    network_mode: host   # all ports (input + output) directly on host — no static mapping needed
     environment:
       RIST_API_PORT: "3001"
       RIST_API_KEY: "${RIST_API_KEY:-}"
@@ -59,7 +54,7 @@ services:
     restart: unless-stopped
     depends_on:
       rist-api:
-        condition: service_healthy
+        condition: service_started   # ui-browser calls API directly; no internal Docker routing needed
 
   # ── Dev UI (only with: docker compose --profile dev up) ───────────────────
   ui-dev:
