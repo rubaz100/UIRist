@@ -33,6 +33,9 @@ export function parseRistMetrics(text: string): RistFlow[] {
       packetsReceived: 0,
       packetsRecovered: 0,
       packetsLost: 0,
+      bitrate: 0,
+      avgBufferTime: 0,
+      peers: [],
     });
   }
 

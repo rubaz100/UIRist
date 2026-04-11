@@ -108,17 +108,62 @@ function stopReceiver(id) {
   return true;
 }
 
+/**
+ * Parse the latest receiver-stats JSON from ristreceiver log output.
+ * ristreceiver writes stats as [INFO] JSON lines to stderr.
+ */
+function parseFlowsFromLogs(rec) {
+  // Flatten all log entries into individual lines (data events may batch multiple lines)
+  const lines = rec.logs.flatMap(entry => entry.split('\n'));
+
+  // Scan in reverse for the most recent receiver-stats JSON line
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    const idx = line.indexOf('{"receiver-stats"');
+    if (idx === -1) continue;
+    try {
+      const json = JSON.parse(line.slice(idx));
+      const fi = json['receiver-stats']?.flowinstant;
+      if (!fi) continue;
+      const s = fi.stats || {};
+      const peers = (fi.peers || []).map(p => ({
+        id: p.id,
+        dead: p.dead ?? 0,
+        rtt: p.stats?.rtt ?? 0,
+        avgRtt: p.stats?.avg_rtt ?? 0,
+        bitrate: p.stats?.bitrate ?? 0,
+        avgBitrate: p.stats?.avg_bitrate ?? 0,
+      }));
+      const activePeer = peers.find(p => p.dead === 0) || peers[0];
+      return [{
+        receiverId: rec.id,
+        receiverName: rec.name,
+        flowId: String(fi.flow_id),
+        peerName: activePeer ? `peer (rtt ${Math.round(activePeer.rtt)}ms)` : 'peer',
+        qualityRatio: (s.quality ?? 100) / 100,
+        packetsReceived: s.received ?? 0,
+        packetsRecovered: s.recovered_total ?? 0,
+        packetsLost: s.lost ?? 0,
+        bitrate: s.bitrate ?? 0,
+        avgBufferTime: s.avg_buffer_time ?? 0,
+        peers,
+      }];
+    } catch { continue; }
+  }
+  return [];
+}
+
 function getReceiverFlows(id) {
   const rec = receivers.get(id);
   if (!rec) return [];
-  return getLatestFlows(rec.socketPath);
+  return parseFlowsFromLogs(rec);
 }
 
 function getAllFlows() {
   const flows = [];
   for (const rec of receivers.values()) {
     if (rec.status === 'running') {
-      flows.push(...getLatestFlows(rec.socketPath));
+      flows.push(...parseFlowsFromLogs(rec));
     }
   }
   return flows;
