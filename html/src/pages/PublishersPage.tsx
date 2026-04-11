@@ -6,7 +6,7 @@ import { apiService } from '../services/api.service';
 import { StreamId } from '../types/api.types';
 import { PublisherCard } from '../components/publisher';
 import { RistFlowCard, AddReceiverDialog, ReceiverCard } from '../components/rist';
-import { SettingsDialog } from '../components/dialogs';
+import { SettingsDialog, SetupDialog } from '../components/dialogs';
 import { useRistStats } from '../hooks/useRistStats';
 import { useRistReceivers } from '../hooks/useRistReceivers';
 import { RefreshTimer } from '../components/ui';
@@ -20,6 +20,7 @@ export const PublishersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(() => !localStorage.getItem('setup-complete'));
 
   // ── RIST state ─────────────────────────────────────────────────────────────
   const ristApiConfigured = ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
@@ -100,48 +101,12 @@ export const PublishersPage: React.FC = () => {
 
         <Row className="mb-3 align-items-center">
           <Col>
-            <h2 className="mb-1">Streams</h2>
-            <p className="text-muted mb-0">Monitor SRT streams and manage RIST flows</p>
+            <h2 className="mb-1">Dashboard</h2>
+            <p className="text-muted mb-0">Live stream monitoring</p>
           </Col>
         </Row>
 
         <Row className="g-4">
-          {/* ── SRT ── */}
-          <Col xs={12} lg={6}>
-            <div className="d-flex align-items-center mb-3">
-              <h5 className="mb-0"><i className="bi bi-broadcast me-2 text-primary"></i>SRT Publishers</h5>
-            </div>
-
-            {!isAuthenticated ? (
-              <Card className="text-center border-warning">
-                <Card.Body className="py-4">
-                  <i className="bi bi-key display-6 mb-2 d-block text-warning opacity-75"></i>
-                  <h6 className="mb-2">API key required</h6>
-                  <p className="text-muted small mb-3">Configure your SLS API key to monitor streams.</p>
-                  <Button variant="outline-warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
-                    <i className="bi bi-gear me-1"></i>Configure
-                  </Button>
-                </Card.Body>
-              </Card>
-            ) : loading ? (
-              <div className="text-center py-5"><Spinner animation="border" role="status"><span className="visually-hidden">Loading…</span></Spinner></div>
-            ) : streamIds.length === 0 ? (
-              <Card className="text-center">
-                <Card.Body className="py-4">
-                  <i className="bi bi-broadcast display-6 mb-2 d-block opacity-50"></i>
-                  <h6 className="mb-2">No active SRT streams</h6>
-                  <p className="text-muted small mb-0">Streams are configured on the server.</p>
-                </Card.Body>
-              </Card>
-            ) : (
-              <div>
-                {Object.entries(groupedStreamIds).map(([publisher, ids]) => (
-                  <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} />
-                ))}
-              </div>
-            )}
-          </Col>
-
           {/* ── RIST ── */}
           <Col xs={12} lg={6}>
             {!ristApiConfigured && (
@@ -213,10 +178,47 @@ export const PublishersPage: React.FC = () => {
               </div>
             )}
           </Col>
+
+          {/* ── SRT ── */}
+          <Col xs={12} lg={6}>
+            <div className="d-flex align-items-center mb-3">
+              <h5 className="mb-0"><i className="bi bi-broadcast me-2 text-primary"></i>SRT Publishers</h5>
+            </div>
+
+            {!isAuthenticated ? (
+              <Card className="text-center border-warning">
+                <Card.Body className="py-4">
+                  <i className="bi bi-key display-6 mb-2 d-block text-warning opacity-75"></i>
+                  <h6 className="mb-2">API key required</h6>
+                  <p className="text-muted small mb-3">Configure your SLS API key to monitor streams.</p>
+                  <Button variant="outline-warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
+                    <i className="bi bi-gear me-1"></i>Configure
+                  </Button>
+                </Card.Body>
+              </Card>
+            ) : loading ? (
+              <div className="text-center py-5"><Spinner animation="border" role="status"><span className="visually-hidden">Loading…</span></Spinner></div>
+            ) : streamIds.length === 0 ? (
+              <Card className="text-center">
+                <Card.Body className="py-4">
+                  <i className="bi bi-broadcast display-6 mb-2 d-block opacity-50"></i>
+                  <h6 className="mb-2">No active SRT streams</h6>
+                  <p className="text-muted small mb-0">Streams are configured on the server.</p>
+                </Card.Body>
+              </Card>
+            ) : (
+              <div>
+                {Object.entries(groupedStreamIds).map(([publisher, ids]) => (
+                  <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} />
+                ))}
+              </div>
+            )}
+          </Col>
         </Row>
       </Container>
 
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
+      <SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
       <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} />
     </>
   );
