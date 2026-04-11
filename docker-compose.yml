@@ -1,24 +1,23 @@
 services:
-  # ── UI (production: nginx + React build) ───────────────────────────────────
-  ui:
-    build:
-      context: .
-      dockerfile: docker/production.Dockerfile
-      args:
-        REACT_APP_BASE_URL: "${APP_URL}"
-        REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-4000}"
-        REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-4001}"
-        REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8080}"
-        REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-}"
-        REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
+  # ── Belabox SRTLA Receiver ──────────────────────────────────────────────────
+  # Receives SRTLA from Belabox, exposes SRT output + SLS management API
+  bbox-receiver:
+    image: datagutt/belabox-receiver:latest
     ports:
-      - "${UI_PORT:-80}:80"
+      - "5000:5000/udp"     # SRTLA input (configure in Belabox app)
+      - "8181:8181/tcp"     # SLS management API (used by UIRist SRT section)
+      - "8282:8282/udp"     # SRT output → OBS/player
+    volumes:
+      - ./bbox-config.json:/app/config.json:ro
     restart: unless-stopped
-    depends_on:
-      rist-api:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/stats", "||", "exit", "1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # ── RIST API (with librist built-in) ───────────────────────────────────────
+  # ── RIST API (UIRist + librist/ristreceiver) ────────────────────────────────
   rist-api:
     build:
       context: ./api
@@ -42,7 +41,28 @@ services:
       retries: 3
       start_period: 10s
 
-  # ── Dev UI (optional, only used with --profile dev) ────────────────────────
+  # ── UIRist UI (nginx + React build) ────────────────────────────────────────
+  ui:
+    build:
+      context: .
+      dockerfile: docker/production.Dockerfile
+      args:
+        # SLS API of bbox-receiver (SRT management)
+        REACT_APP_BASE_URL: "${APP_URL:-http://localhost:8181}"
+        REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-8282}"
+        REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-5000}"
+        REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8181}"
+        REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-5000}"
+        # RIST API
+        REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
+    ports:
+      - "${UI_PORT:-80}:80"
+    restart: unless-stopped
+    depends_on:
+      rist-api:
+        condition: service_healthy
+
+  # ── Dev UI (only with: docker compose --profile dev up) ───────────────────
   ui-dev:
     profiles: ["dev"]
     build:
@@ -51,11 +71,11 @@ services:
     volumes:
       - ./html:/app
     environment:
-      REACT_APP_BASE_URL: "${APP_URL}"
-      REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-4000}"
-      REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-4001}"
-      REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8080}"
-      REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-}"
+      REACT_APP_BASE_URL: "${APP_URL:-http://localhost:8181}"
+      REACT_APP_SRT_PLAYER_PORT: "${SRT_PLAYER_PORT:-8282}"
+      REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-5000}"
+      REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8181}"
+      REACT_APP_SRTLA_PORT: "${SRTLA_PORT:-5000}"
       REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
     ports:
       - "3000:3000"

@@ -1,4 +1,7 @@
 .env
+bbox-config.json
+data/
+api/logs/
 
 # Created by https://www.toptal.com/developers/gitignore/api/window,linux,macos,phpstorm
 # Edit at https://www.toptal.com/developers/gitignore?templates=window,linux,macos,phpstorm
