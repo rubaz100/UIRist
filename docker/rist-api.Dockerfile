@@ -39,7 +39,8 @@ RUN mkdir -p /app/data /app/logs
 ENV RIST_API_PORT=3001 \
     RISTRECEIVER_BIN=/usr/local/bin/ristreceiver \
     RIST_STATE_FILE=/app/data/receivers.json \
-    NODE_ENV=production
+    NODE_ENV=production \
+    LD_LIBRARY_PATH=/usr/local/lib
 
 EXPOSE 3001
 
