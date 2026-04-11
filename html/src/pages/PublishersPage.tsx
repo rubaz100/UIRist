@@ -84,19 +84,6 @@ export const PublishersPage: React.FC = () => {
       </Navbar>
 
       <Container className="py-4">
-        {!isAuthenticated && (
-          <Alert variant="warning" className="d-flex align-items-center gap-3 mb-4">
-            <i className="bi bi-key fs-4"></i>
-            <div className="flex-grow-1">
-              <strong>SRT API key required</strong>
-              <div className="small">Configure your SLS API key in settings to monitor SRT streams.</div>
-            </div>
-            <Button variant="warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
-              <i className="bi bi-gear me-1"></i>Settings
-            </Button>
-          </Alert>
-        )}
-
         {error && (
           <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-3">{error}</Alert>
         )}
