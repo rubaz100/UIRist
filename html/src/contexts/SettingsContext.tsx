@@ -16,7 +16,8 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
-  const [ristApiUrl, setRistApiUrlState] = useState<string>(config.ristApiUrl);
+  const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
+  const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
   const [enabledServices, setEnabledServicesState] = useState<ServiceType[]>([]);
 
   useEffect(() => {

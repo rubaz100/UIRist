@@ -104,11 +104,12 @@ export const PublishersPage: React.FC = () => {
   // ── RIST state ─────────────────────────────────────────────────────────────
   const srtEnabled = enabledServices.includes('srt');
   const ristEnabled = enabledServices.includes('rist');
+  const ristApiConfigured = ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
 
   const { flows: ristFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
-    useRistStats(ristEnabled ? ristApiUrl : '');
+    useRistStats(ristEnabled && ristApiConfigured ? ristApiUrl : '');
   const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, refresh: refreshReceivers } =
-    useRistReceivers(ristEnabled ? ristApiUrl : '');
+    useRistReceivers(ristEnabled && ristApiConfigured ? ristApiUrl : '');
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
   const [receiversExpanded, setReceiversExpanded] = useState(false);
 
@@ -300,6 +301,19 @@ export const PublishersPage: React.FC = () => {
           {/* ── RIST Receivers + Flows ── */}
           {ristEnabled && (
             <Col xs={12} lg={srtEnabled ? 6 : 12}>
+              {!ristApiConfigured && (
+                <Alert variant="warning" className="d-flex align-items-center gap-3 mb-3">
+                  <i className="bi bi-link-45deg fs-4"></i>
+                  <div className="flex-grow-1">
+                    <strong>RIST API URL required</strong>
+                    <div className="small">Configure the URL of the UIRist API server in settings to manage receivers.</div>
+                  </div>
+                  <Button variant="warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
+                    <i className="bi bi-gear me-1"></i>Settings
+                  </Button>
+                </Alert>
+              )}
+
               {/* Receivers */}
               <div className="mb-3">
                 <div className="d-flex align-items-center justify-content-between mb-2">
@@ -313,7 +327,7 @@ export const PublishersPage: React.FC = () => {
                     <span className="badge bg-secondary">{receivers.length}</span>
                     <i className={`bi bi-chevron-${receiversExpanded ? 'up' : 'down'} small`}></i>
                   </Button>
-                  <Button variant="outline-info" size="sm" onClick={() => setAddReceiverOpen(true)}>
+                  <Button variant="outline-info" size="sm" onClick={() => setAddReceiverOpen(true)} disabled={!ristApiConfigured}>
                     <i className="bi bi-plus-lg me-1"></i>Add
                   </Button>
                 </div>
