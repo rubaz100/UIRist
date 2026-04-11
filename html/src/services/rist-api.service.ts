@@ -68,7 +68,7 @@ class RistApiService {
     return res.data.logs;
   }
 
-  async checkPort(port: number): Promise<{ port: number; available: boolean; reserved: boolean; usedByReceiver: boolean }> {
+  async checkPort(port: number): Promise<{ port: number; available: boolean; reserved: boolean; usedByReceiver: boolean; outOfRange?: boolean; allowedRange?: { min: number; max: number } }> {
     const res = await axios.get(`${this.baseUrl}/api/ports/check`, { ...this.opts(), params: { port } });
     return res.data;
   }

@@ -2,7 +2,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const log = require('./src/logger');
-const { isUdpPortAvailable, RESERVED_PORTS } = require('./src/portChecker');
+const { isUdpPortAvailable, RESERVED_PORTS, RECEIVER_PORT_MIN, RECEIVER_PORT_MAX } = require('./src/portChecker');
 const {
   startReceiver, stopReceiver, listReceivers, getReceiver,
   getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
@@ -73,8 +73,9 @@ app.get('/api/ports/check', auth, async (req, res) => {
   }
   const reserved = RESERVED_PORTS.has(port);
   const usedByReceiver = getUsedPorts().includes(port);
-  const available = !reserved && !usedByReceiver && await isUdpPortAvailable(port);
-  res.json({ port, available, reserved, usedByReceiver });
+  const outOfRange = port < RECEIVER_PORT_MIN || port > RECEIVER_PORT_MAX;
+  const available = !reserved && !usedByReceiver && !outOfRange && await isUdpPortAvailable(port);
+  res.json({ port, available, reserved, usedByReceiver, outOfRange, allowedRange: { min: RECEIVER_PORT_MIN, max: RECEIVER_PORT_MAX } });
 });
 
 app.get('/api/ports/used', auth, (req, res) => {

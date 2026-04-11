@@ -11,7 +11,7 @@ interface AddReceiverDialogProps {
   defaultOutputHost?: string;
 }
 
-type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'invalid';
+type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'out-of-range' | 'invalid';
 
 export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '', defaultOutputHost = '127.0.0.1' }) => {
   const [name, setName] = useState('');
@@ -33,6 +33,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
       const result = await ristApiService.checkPort(port);
       if (result.reserved) setPortStatus('reserved');
       else if (result.usedByReceiver) setPortStatus('used');
+      else if (result.outOfRange) setPortStatus('out-of-range');
       else if (result.available) setPortStatus('available');
       else setPortStatus('used');
     } catch {
@@ -91,16 +92,17 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
 
   const portFeedback = () => {
     switch (portStatus) {
-      case 'checking':   return <Form.Text className="text-muted">Checking availability…</Form.Text>;
-      case 'available':  return <Form.Text className="text-success"><i className="bi bi-check-circle me-1"></i>Port is available</Form.Text>;
-      case 'reserved':   return <Form.Text className="text-danger"><i className="bi bi-slash-circle me-1"></i>Reserved — used by system or UIRist</Form.Text>;
-      case 'used':       return <Form.Text className="text-danger"><i className="bi bi-x-circle me-1"></i>Already in use by another receiver</Form.Text>;
-      case 'invalid':    return <Form.Text className="text-warning">Enter a valid port (1–65535)</Form.Text>;
-      default:           return <Form.Text className="text-muted">RIST streams will be received on this UDP port.</Form.Text>;
+      case 'checking':     return <Form.Text className="text-muted">Checking availability…</Form.Text>;
+      case 'available':    return <Form.Text className="text-success"><i className="bi bi-check-circle me-1"></i>Port is available</Form.Text>;
+      case 'reserved':     return <Form.Text className="text-danger"><i className="bi bi-slash-circle me-1"></i>Reserved — used by system or UIRist</Form.Text>;
+      case 'used':         return <Form.Text className="text-danger"><i className="bi bi-x-circle me-1"></i>Already in use by another receiver</Form.Text>;
+      case 'out-of-range': return <Form.Text className="text-warning"><i className="bi bi-exclamation-triangle me-1"></i>Outside exposed Docker range (5005–5020) — port won't be reachable</Form.Text>;
+      case 'invalid':      return <Form.Text className="text-warning">Enter a valid port (1–65535)</Form.Text>;
+      default:             return <Form.Text className="text-muted">RIST streams will be received on this UDP port.</Form.Text>;
     }
   };
 
-  const blocked = portStatus === 'reserved' || portStatus === 'used';
+  const blocked = portStatus === 'reserved' || portStatus === 'used' || portStatus === 'out-of-range';
 
   return (
     <Modal show={open} onHide={handleClose} centered>

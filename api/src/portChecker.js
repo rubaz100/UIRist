@@ -46,4 +46,9 @@ const RESERVED_PORTS = new Set([
   22, 53, 123,      // SSH, DNS, NTP
 ]);
 
-module.exports = { isUdpPortAvailable, isTcpPortAvailable, RESERVED_PORTS };
+// UDP port range exposed by docker-compose for ristreceiver instances (5005–5020).
+// Ports outside this range will bind inside the container but won't be reachable from outside.
+const RECEIVER_PORT_MIN = 5005;
+const RECEIVER_PORT_MAX = 5020;
+
+module.exports = { isUdpPortAvailable, isTcpPortAvailable, RESERVED_PORTS, RECEIVER_PORT_MIN, RECEIVER_PORT_MAX };

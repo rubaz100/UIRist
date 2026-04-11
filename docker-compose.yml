@@ -12,13 +12,15 @@ services:
     restart: unless-stopped
 
   # ── RIST API (UIRist + librist/ristreceiver) ────────────────────────────────
-  # network_mode: host — ristreceiver binds UDP ports directly on the host,
-  # so any receiver port (5005, etc.) is immediately reachable without port mapping.
+  # Expose port 3001 (API) plus a UDP range for ristreceiver instances.
+  # Add more ports to RIST_RECEIVER_PORTS or extend the range below as needed.
   rist-api:
     build:
       context: ./api
       dockerfile: ../docker/rist-api.Dockerfile
-    network_mode: host
+    ports:
+      - "${RIST_API_PORT:-3001}:3001"
+      - "5005-5020:5005-5020/udp"   # RIST receiver ports — extend range in .env if needed
     environment:
       RIST_API_PORT: "3001"
       RIST_API_KEY: "${RIST_API_KEY:-}"
