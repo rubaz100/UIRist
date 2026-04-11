@@ -1,4 +1,16 @@
 services:
+  # ── Belabox SRTLA Receiver (datagutt/belabox-receiver) ─────────────────────
+  # Updates: docker compose pull && docker compose up -d
+  bbox-receiver:
+    image: datagutt/belabox-receiver:latest
+    ports:
+      - "5000:5000/udp"     # SRTLA input ← Belabox app
+      - "8181:8181/tcp"     # SLS management API (UIRist SRT section)
+      - "8282:8282/udp"     # SRT output → OBS/VLC
+    volumes:
+      - ./bbox-config.json:/app/config.json:ro
+    restart: unless-stopped
+
   # ── RIST API (UIRist + librist/ristreceiver) ────────────────────────────────
   rist-api:
     build:
@@ -24,7 +36,6 @@ services:
       start_period: 10s
 
   # ── UIRist UI (nginx + React build) ────────────────────────────────────────
-  # bbox-receiver / SRTLA is managed by the existing ingestsrv stack
   ui:
     build:
       context: .
