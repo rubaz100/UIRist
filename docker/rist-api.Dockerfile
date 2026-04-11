@@ -21,11 +21,12 @@ RUN meson setup build --buildtype=release \
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:22-alpine
 
-RUN apk add --no-cache mbedtls libstdc++
+RUN apk add --no-cache libstdc++
 
-# Copy ristreceiver binary and shared libs from builder
+# Copy ristreceiver, librist, and the exact mbedtls version used at build time
 COPY --from=builder /usr/local/bin/ristreceiver /usr/local/bin/ristreceiver
 COPY --from=builder /usr/local/lib/librist* /usr/local/lib/
+COPY --from=builder /usr/lib/libmbed* /usr/local/lib/
 
 WORKDIR /app
 
