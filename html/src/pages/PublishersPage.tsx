@@ -376,7 +376,7 @@ export const PublishersPage: React.FC = () => {
 
       <AddStreamDialog open={addDialogOpen} onClose={() => { setAddDialogOpen(false); setPrefillPublisher(undefined); }} onStreamAdded={handleStreamAdded} prefillPublisher={prefillPublisher} />
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
-      <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} />
+      <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} />
     </>
   );
 };

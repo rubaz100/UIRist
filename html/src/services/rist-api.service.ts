@@ -63,6 +63,16 @@ class RistApiService {
     const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${id}/logs`, { headers: this.headers() });
     return res.data.logs;
   }
+
+  async checkPort(port: number): Promise<{ port: number; available: boolean; reserved: boolean; usedByReceiver: boolean }> {
+    const res = await axios.get(`${this.baseUrl}/api/ports/check`, { params: { port }, headers: this.headers() });
+    return res.data;
+  }
+
+  async getUsedPorts(): Promise<{ receiverPorts: number[]; reservedPorts: number[] }> {
+    const res = await axios.get(`${this.baseUrl}/api/ports/used`, { headers: this.headers() });
+    return res.data;
+  }
 }
 
 export const ristApiService = new RistApiService();

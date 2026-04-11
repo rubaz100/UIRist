@@ -1,25 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Modal, Form, Button, Alert } from 'react-bootstrap';
 import { CreateReceiverPayload } from '../../services/rist-api.service';
+import { ristApiService } from '../../services/rist-api.service';
 
 interface AddReceiverDialogProps {
   open: boolean;
   onClose: () => void;
   onCreate: (payload: CreateReceiverPayload) => Promise<void>;
+  apiKey?: string;
 }
 
-export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate }) => {
+type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'invalid';
+
+export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '' }) => {
   const [name, setName] = useState('');
-  const [listenPort, setListenPort] = useState('5000');
+  const [listenPort, setListenPort] = useState('5005');
   const [outputUrl, setOutputUrl] = useState('udp://127.0.0.1:5001');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [portStatus, setPortStatus] = useState<PortStatus>('idle');
+
+  const checkPort = useCallback(async (portStr: string) => {
+    const port = parseInt(portStr, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      setPortStatus('invalid');
+      return;
+    }
+    setPortStatus('checking');
+    try {
+      ristApiService.setApiKey(apiKey);
+      const result = await ristApiService.checkPort(port);
+      if (result.reserved) setPortStatus('reserved');
+      else if (result.usedByReceiver) setPortStatus('used');
+      else if (result.available) setPortStatus('available');
+      else setPortStatus('used');
+    } catch {
+      setPortStatus('idle'); // API unreachable — allow submit, server will validate
+    }
+  }, [apiKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => checkPort(listenPort), 400);
+    return () => clearTimeout(timer);
+  }, [listenPort, open, checkPort]);
 
   const handleClose = () => {
-    setName('');
-    setListenPort('5000');
-    setOutputUrl('udp://127.0.0.1:5001');
-    setError(null);
+    setName(''); setListenPort('5005'); setOutputUrl('udp://127.0.0.1:5001');
+    setError(null); setPortStatus('idle');
     onClose();
   };
 
@@ -31,6 +59,14 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
     }
     if (!outputUrl.trim()) {
       setError('Output URL is required.');
+      return;
+    }
+    if (portStatus === 'reserved') {
+      setError(`Port ${port} is reserved (used by system or UIRist itself).`);
+      return;
+    }
+    if (portStatus === 'used') {
+      setError(`Port ${port} is already in use by another receiver.`);
       return;
     }
     setError(null);
@@ -45,25 +81,30 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
     }
   };
 
+  const portFeedback = () => {
+    switch (portStatus) {
+      case 'checking':   return <Form.Text className="text-muted">Checking availability…</Form.Text>;
+      case 'available':  return <Form.Text className="text-success"><i className="bi bi-check-circle me-1"></i>Port is available</Form.Text>;
+      case 'reserved':   return <Form.Text className="text-danger"><i className="bi bi-slash-circle me-1"></i>Reserved — used by system or UIRist</Form.Text>;
+      case 'used':       return <Form.Text className="text-danger"><i className="bi bi-x-circle me-1"></i>Already in use by another receiver</Form.Text>;
+      case 'invalid':    return <Form.Text className="text-warning">Enter a valid port (1–65535)</Form.Text>;
+      default:           return <Form.Text className="text-muted">RIST streams will be received on this UDP port.</Form.Text>;
+    }
+  };
+
+  const blocked = portStatus === 'reserved' || portStatus === 'used';
+
   return (
     <Modal show={open} onHide={handleClose} centered>
       <Modal.Header closeButton>
-        <Modal.Title>
-          <i className="bi bi-diagram-3 me-2"></i>
-          Add RIST Receiver
-        </Modal.Title>
+        <Modal.Title><i className="bi bi-diagram-3 me-2"></i>Add RIST Receiver</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
         <Form>
           <Form.Group className="mb-3">
             <Form.Label>Name <span className="text-muted">(optional)</span></Form.Label>
-            <Form.Control
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. encoder-main"
-            />
+            <Form.Control type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. encoder-main" />
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Listen Port (UDP)</Form.Label>
@@ -71,13 +112,12 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
               type="number"
               value={listenPort}
               onChange={e => setListenPort(e.target.value)}
-              placeholder="5000"
-              min={1}
-              max={65535}
+              placeholder="5005"
+              min={1} max={65535}
+              isValid={portStatus === 'available'}
+              isInvalid={portStatus === 'reserved' || portStatus === 'used' || portStatus === 'invalid'}
             />
-            <Form.Text className="text-muted">
-              RIST streams will be received on this UDP port.
-            </Form.Text>
+            {portFeedback()}
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Output URL</Form.Label>
@@ -95,7 +135,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={handleClose} disabled={loading}>Cancel</Button>
-        <Button variant="primary" onClick={handleSubmit} disabled={loading}>
+        <Button variant="primary" onClick={handleSubmit} disabled={loading || blocked}>
           {loading ? 'Starting…' : 'Start Receiver'}
         </Button>
       </Modal.Footer>

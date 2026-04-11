@@ -3,6 +3,8 @@ const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const { startSocketServer, stopSocketServer } = require('./metricsServer');
 const { saveState, loadState } = require('./stateManager');
+const { isUdpPortAvailable } = require('./portChecker');
+const log = require('./logger');
 
 function findBinary() {
   const candidates = [
@@ -27,9 +29,15 @@ function findBinary() {
 const BINARY = findBinary();
 const receivers = new Map();
 
-function startReceiver({ name, listenPort, outputUrl, id: existingId, createdAt: existingCreatedAt } = {}) {
+async function startReceiver({ name, listenPort, outputUrl, id: existingId, createdAt: existingCreatedAt } = {}) {
   if (!BINARY) {
     throw new Error('ristreceiver binary not found. Install librist: brew install librist');
+  }
+
+  // Port conflict detection
+  const portFree = await isUdpPortAvailable(listenPort);
+  if (!portFree) {
+    throw new Error(`UDP port ${listenPort} is already in use`);
   }
 
   const id = existingId || uuidv4();
@@ -71,17 +79,20 @@ function startReceiver({ name, listenPort, outputUrl, id: existingId, createdAt:
 
   proc.on('spawn', () => {
     record.status = 'running';
+    log.info('Receiver started', { id, name: recName, port: listenPort });
     saveState(receivers);
   });
   proc.on('error', (err) => {
     record.status = 'error';
     record.error = err.message;
+    log.error('Receiver process error', { id, name: recName, error: err.message });
     stopSocketServer(socketPath);
     saveState(receivers);
   });
   proc.on('exit', (code) => {
     record.status = code === 0 ? 'stopped' : 'error';
     record.pid = null;
+    log.info('Receiver exited', { id, name: recName, code });
     stopSocketServer(socketPath);
     saveState(receivers);
   });
@@ -106,29 +117,27 @@ function stopReceiver(id) {
   stopSocketServer(rec.socketPath);
   rec.status = 'stopped';
   receivers.delete(id);
+  log.info('Receiver stopped', { id, name: rec.name });
   saveState(receivers);
   return true;
 }
 
-/** Restore receivers from persisted state on startup */
-function restoreState() {
+async function restoreState() {
   const saved = loadState();
   if (!saved.length) return;
-  console.log(`[state] Restoring ${saved.length} receiver(s)…`);
+  log.info(`Restoring ${saved.length} receiver(s) from state`);
   for (const rec of saved) {
     try {
-      startReceiver({ name: rec.name, listenPort: rec.listenPort, outputUrl: rec.outputUrl, id: rec.id, createdAt: rec.createdAt });
-      console.log(`[state] Restored: ${rec.name} (port ${rec.listenPort})`);
+      await startReceiver({ name: rec.name, listenPort: rec.listenPort, outputUrl: rec.outputUrl, id: rec.id, createdAt: rec.createdAt });
+      log.info('Receiver restored', { name: rec.name, port: rec.listenPort });
     } catch (err) {
-      console.error(`[state] Failed to restore ${rec.name}: ${err.message}`);
+      log.error('Failed to restore receiver', { name: rec.name, error: err.message });
     }
   }
 }
 
-/** Parse the latest receiver-stats JSON from ristreceiver log output */
 function parseFlowsFromLogs(rec) {
   const lines = rec.logs.flatMap(entry => entry.split('\n'));
-
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     const idx = line.indexOf('{"receiver-stats"');
@@ -194,10 +203,16 @@ function getBinaryStatus() {
   return { available: !!BINARY, path: BINARY || null };
 }
 
+function getUsedPorts() {
+  return Array.from(receivers.values())
+    .filter(r => r.status === 'running' || r.status === 'starting')
+    .map(r => r.listenPort);
+}
+
 // Restore on startup
 restoreState();
 
 module.exports = {
   startReceiver, stopReceiver, listReceivers, getReceiver,
-  getReceiverFlows, getAllFlows, getBinaryStatus, receivers,
+  getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
 };

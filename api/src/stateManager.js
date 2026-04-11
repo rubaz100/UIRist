@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const log = require('./logger');
 
 const STATE_FILE = process.env.RIST_STATE_FILE || path.join(__dirname, '../../data/receivers.json');
 
@@ -15,7 +16,7 @@ function saveState(receivers) {
     const data = Array.from(receivers.values()).map(({ _proc, logs, ...rec }) => rec);
     fs.writeFileSync(STATE_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error('[state] Failed to save state:', err.message);
+    log.error('Failed to save state', { error: err.message });
   }
 }
 
@@ -25,7 +26,7 @@ function loadState() {
     const raw = fs.readFileSync(STATE_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (err) {
-    console.error('[state] Failed to load state:', err.message);
+    log.error('Failed to load state', { error: err.message });
     return [];
   }
 }
