@@ -19,6 +19,8 @@ services:
       context: ./api
       dockerfile: ../docker/rist-api.Dockerfile
     network_mode: host   # all ports (input + output) directly on host — no static mapping needed
+    cap_add:
+      - NET_ADMIN          # allows iptables rules for auto port management
     environment:
       RIST_API_PORT: "3001"
       RIST_API_KEY: "${RIST_API_KEY:-}"

@@ -2,6 +2,7 @@
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const { startSocketServer, stopSocketServer, getPeerIps } = require('./metricsServer');
+const { openPort, closePort, srtListenerPort } = require('./portManager');
 const { saveState, loadState } = require('./stateManager');
 const { isUdpPortAvailable } = require('./portChecker');
 const log = require('./logger');
@@ -80,6 +81,9 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
   proc.on('spawn', () => {
     record.status = 'running';
     log.info('Receiver started', { id, name: recName, port: listenPort });
+    openPort(listenPort, 'udp');                            // RIST input
+    const srtPort = srtListenerPort(outputUrl);
+    if (srtPort) openPort(srtPort, 'tcp');                  // SRT output listener
     saveState(receivers);
   });
   proc.on('error', (err) => {
@@ -115,6 +119,9 @@ function stopReceiver(id) {
   if (!rec) return false;
   if (rec._proc) rec._proc.kill('SIGTERM');
   stopSocketServer(rec.socketPath);
+  closePort(rec.listenPort, 'udp');
+  const srtPort = srtListenerPort(rec.outputUrl);
+  if (srtPort) closePort(srtPort, 'tcp');
   rec.status = 'stopped';
   receivers.delete(id);
   log.info('Receiver stopped', { id, name: rec.name });
