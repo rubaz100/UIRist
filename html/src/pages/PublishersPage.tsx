@@ -206,7 +206,7 @@ export const PublishersPage: React.FC = () => {
             <i className="bi bi-key fs-4"></i>
             <div className="flex-grow-1">
               <strong>SRT API key required</strong>
-              <div className="small">Configure your SLS API key in settings to manage SRT streams.</div>
+              <div className="small">Configure your SLS API key in settings to monitor SRT streams.</div>
             </div>
             <Button variant="warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
               <i className="bi bi-gear me-1"></i>Settings
@@ -222,8 +222,8 @@ export const PublishersPage: React.FC = () => {
           <Col>
             <h2 className="mb-1">Streams</h2>
             <p className="text-muted mb-0">
-              {srtEnabled && ristEnabled && 'Manage SRT publishers and RIST flows'}
-              {srtEnabled && !ristEnabled && 'Manage SRT publishers'}
+              {srtEnabled && ristEnabled && 'Monitor SRT streams and manage RIST flows'}
+              {srtEnabled && !ristEnabled && 'Monitor SRT streams'}
               {!srtEnabled && ristEnabled && 'Monitor and manage RIST flows'}
             </p>
           </Col>
@@ -242,7 +242,7 @@ export const PublishersPage: React.FC = () => {
                   <Card.Body className="py-4">
                     <i className="bi bi-key display-6 mb-2 d-block text-warning opacity-75"></i>
                     <h6 className="mb-2">API key required</h6>
-                    <p className="text-muted small mb-3">Configure your SLS API key to manage streams.</p>
+                    <p className="text-muted small mb-3">Configure your SLS API key to monitor streams.</p>
                     <Button variant="outline-warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
                       <i className="bi bi-gear me-1"></i>Configure
                     </Button>
