@@ -338,7 +338,7 @@ export const PublishersPage: React.FC = () => {
                     ) : receivers.length === 0 ? (
                       <p className="text-muted small mb-0">No receivers running. Click Add to start one.</p>
                     ) : (
-                      receivers.map(r => <ReceiverCard key={r.id} receiver={r} onDelete={deleteReceiver} />)
+                      receivers.map(r => <ReceiverCard key={r.id} receiver={r} serverHost={(() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })()} onDelete={deleteReceiver} />)
                     )}
                   </div>
                 </Collapse>
