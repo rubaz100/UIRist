@@ -8,8 +8,18 @@ const net   = require('net');
 function isUdpPortAvailable(port) {
   return new Promise((resolve) => {
     const sock = dgram.createSocket('udp4');
-    sock.once('error', () => resolve(false));
-    sock.bind(port, '0.0.0.0', () => sock.close(() => resolve(true)));
+    let settled = false;
+    const done = (val) => {
+      if (settled) return;
+      settled = true;
+      resolve(val);
+    };
+    const timer = setTimeout(() => {
+      try { sock.close(() => {}); } catch (_) {}
+      done(false);
+    }, 3000);
+    sock.once('error', () => { clearTimeout(timer); done(false); });
+    sock.bind(port, '0.0.0.0', () => { clearTimeout(timer); sock.close(() => done(true)); });
   });
 }
 

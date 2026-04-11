@@ -30,47 +30,51 @@ class RistApiService {
     return this.apiKey ? { 'X-API-Key': this.apiKey } : {};
   }
 
+  private opts() {
+    return { headers: this.headers(), timeout: 8000 };
+  }
+
   async getHealth(): Promise<HealthResponse> {
-    const res = await axios.get<HealthResponse>(`${this.baseUrl}/health`, { headers: this.headers() });
+    const res = await axios.get<HealthResponse>(`${this.baseUrl}/health`, this.opts());
     return res.data;
   }
 
   async getReceivers(): Promise<RistReceiver[]> {
-    const res = await axios.get<RistReceiver[]>(`${this.baseUrl}/api/receivers`, { headers: this.headers() });
+    const res = await axios.get<RistReceiver[]>(`${this.baseUrl}/api/receivers`, this.opts());
     return res.data;
   }
 
   async createReceiver(payload: CreateReceiverPayload): Promise<RistReceiver> {
-    const res = await axios.post<RistReceiver>(`${this.baseUrl}/api/receivers`, payload, { headers: this.headers() });
+    const res = await axios.post<RistReceiver>(`${this.baseUrl}/api/receivers`, payload, this.opts());
     return res.data;
   }
 
   async deleteReceiver(id: string): Promise<void> {
-    await axios.delete(`${this.baseUrl}/api/receivers/${id}`, { headers: this.headers() });
+    await axios.delete(`${this.baseUrl}/api/receivers/${id}`, this.opts());
   }
 
   async getStats(): Promise<RistFlow[]> {
-    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/stats`, { headers: this.headers() });
+    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/stats`, this.opts());
     return res.data.flows;
   }
 
   async getReceiverStats(id: string): Promise<RistFlow[]> {
-    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/receivers/${id}/stats`, { headers: this.headers() });
+    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/receivers/${id}/stats`, this.opts());
     return res.data.flows;
   }
 
   async getReceiverLogs(id: string): Promise<string[]> {
-    const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${id}/logs`, { headers: this.headers() });
+    const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${id}/logs`, this.opts());
     return res.data.logs;
   }
 
   async checkPort(port: number): Promise<{ port: number; available: boolean; reserved: boolean; usedByReceiver: boolean }> {
-    const res = await axios.get(`${this.baseUrl}/api/ports/check`, { params: { port }, headers: this.headers() });
+    const res = await axios.get(`${this.baseUrl}/api/ports/check`, { ...this.opts(), params: { port } });
     return res.data;
   }
 
   async getUsedPorts(): Promise<{ receiverPorts: number[]; reservedPorts: number[] }> {
-    const res = await axios.get(`${this.baseUrl}/api/ports/used`, { headers: this.headers() });
+    const res = await axios.get(`${this.baseUrl}/api/ports/used`, this.opts());
     return res.data;
   }
 }
