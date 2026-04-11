@@ -1,7 +1,7 @@
 'use strict';
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
-const { startSocketServer, stopSocketServer } = require('./metricsServer');
+const { startSocketServer, stopSocketServer, getPeerIps } = require('./metricsServer');
 const { saveState, loadState } = require('./stateManager');
 const { isUdpPortAvailable } = require('./portChecker');
 const log = require('./logger');
@@ -147,13 +147,17 @@ function parseFlowsFromLogs(rec) {
       const fi = json['receiver-stats']?.flowinstant;
       if (!fi) continue;
       const s = fi.stats || {};
-      const peers = (fi.peers || []).map(p => ({
+      // Get peer IPs from Prometheus metrics (peer_name label = "rist://IP:port")
+      const promPeerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
+      const peers = (fi.peers || []).map((p, idx) => ({
         id: p.id,
         dead: p.dead ?? 0,
         rtt: p.stats?.rtt ?? 0,
         avgRtt: p.stats?.avg_rtt ?? 0,
         bitrate: p.stats?.bitrate ?? 0,
         avgBitrate: p.stats?.avg_bitrate ?? 0,
+        // Try to match Prometheus IP by index; fall back to address field if ristreceiver adds it
+        ip: p.address ?? p.peer_address ?? promPeerIps[idx] ?? null,
       }));
       const activePeer = peers.find(p => p.dead === 0) || peers[0];
       return [{

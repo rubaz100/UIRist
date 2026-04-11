@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "UIRist",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--prefix", "html"],
+      "port": 3000
+    }
+  ]
+}

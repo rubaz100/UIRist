@@ -65,6 +65,36 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0', ristreceiver: getBinaryStatus() });
 });
 
+// ── IP lookup (ISP / provider resolution) ─────────────────────────────────────
+const ipLookupCache = new Map(); // ip → { data, cachedAt }
+const IP_CACHE_TTL = 3_600_000; // 1 hour
+
+function isPrivateIp(ip) {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1$|fd[0-9a-f]{2}:)/i.test(ip);
+}
+
+app.get('/api/ip-lookup/:ip', auth, async (req, res) => {
+  const { ip } = req.params;
+  if (!/^[\d.:a-fA-F]+$/.test(ip)) return res.status(400).json({ error: 'Invalid IP' });
+
+  if (isPrivateIp(ip)) return res.json({ ip, isp: 'Private / Local', country: null, city: null });
+
+  const cached = ipLookupCache.get(ip);
+  if (cached && Date.now() - cached.cachedAt < IP_CACHE_TTL) return res.json(cached.data);
+
+  try {
+    const r = await fetch(`http://ip-api.com/json/${ip}?fields=status,isp,org,country,city`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    const d = await r.json();
+    const data = { ip, isp: d.isp || d.org || null, country: d.country || null, city: d.city || null };
+    ipLookupCache.set(ip, { data, cachedAt: Date.now() });
+    res.json(data);
+  } catch {
+    res.json({ ip, isp: null, country: null, city: null });
+  }
+});
+
 // ── Port availability ─────────────────────────────────────────────────────────
 app.get('/api/ports/check', auth, async (req, res) => {
   const port = parseInt(req.query.port, 10);

@@ -21,6 +21,8 @@ services:
     ports:
       - "${RIST_API_PORT:-3001}:3001"
       - "5005-5020:5005-5020/udp"   # RIST receiver ports — extend range in .env if needed
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets ristreceiver forward to host ports (udp://host.docker.internal:5001)
     environment:
       RIST_API_PORT: "3001"
       RIST_API_KEY: "${RIST_API_KEY:-}"

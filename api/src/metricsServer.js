@@ -49,8 +49,21 @@ function getLatestFlows(socketPath) {
   return entry ? entry.state.latestFlows : [];
 }
 
+/**
+ * Extract a bare IP (without rist:// scheme and port) from a peer_name label.
+ * ristreceiver typically outputs something like "rist://203.0.113.5:5004" or "203.0.113.5:5004".
+ */
+function parsePeerIp(peerName) {
+  if (!peerName) return null;
+  const stripped = peerName.replace(/^rist:\/\//i, '');
+  const colonIdx = stripped.lastIndexOf(':');
+  return colonIdx > 0 ? stripped.slice(0, colonIdx) : stripped || null;
+}
+
 function samplesToFlows(samples, receiverId, receiverName) {
   const flowMap = new Map();
+  // Collect unique peer IPs per flow
+  const peerIpsMap = new Map(); // flowId → Set<string>
 
   const getOrCreate = (flowId, peerName) => {
     if (!flowMap.has(flowId)) {
@@ -64,6 +77,7 @@ function samplesToFlows(samples, receiverId, receiverName) {
         packetsRecovered: 0,
         packetsLost: 0,
       });
+      peerIpsMap.set(flowId, new Set());
     }
     return flowMap.get(flowId);
   };
@@ -72,6 +86,10 @@ function samplesToFlows(samples, receiverId, receiverName) {
     const id = s.labels['flow_id'] || s.labels['id'] || 'unknown';
     const peer = s.labels['peer_name'] || s.labels['peer'] || '';
     const flow = getOrCreate(id, peer);
+
+    const ip = parsePeerIp(peer);
+    if (ip) peerIpsMap.get(id)?.add(ip);
+
     if (s.name.includes('quality_ratio')) flow.qualityRatio = s.value;
     else if (s.name.includes('received_packets') || s.name.includes('packets_received'))
       flow.packetsReceived = s.value;
@@ -81,7 +99,20 @@ function samplesToFlows(samples, receiverId, receiverName) {
       flow.packetsLost = s.value;
   }
 
+  // Attach peer IPs to each flow
+  for (const [flowId, flow] of flowMap) {
+    flow.peerIps = Array.from(peerIpsMap.get(flowId) || []);
+  }
+
   return Array.from(flowMap.values());
 }
 
-module.exports = { startSocketServer, stopSocketServer, getLatestFlows };
+/** Return peer IP list for a given socket path and flow ID */
+function getPeerIps(socketPath, flowId) {
+  const entry = socketServers.get(socketPath);
+  if (!entry) return [];
+  const flow = entry.state.latestFlows.find(f => f.flowId === flowId);
+  return flow?.peerIps ?? [];
+}
+
+module.exports = { startSocketServer, stopSocketServer, getLatestFlows, getPeerIps };

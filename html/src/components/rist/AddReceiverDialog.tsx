@@ -138,7 +138,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
               placeholder="udp://127.0.0.1:5001"
             />
             <Form.Text className="text-muted">
-              Where to forward the decoded stream (e.g. <code>udp://127.0.0.1:5001</code>).
+              Where to forward the decoded stream. Use <code>host.docker.internal</code> to reach the host (e.g. <code>udp://host.docker.internal:5001</code>).
             </Form.Text>
           </Form.Group>
         </Form>

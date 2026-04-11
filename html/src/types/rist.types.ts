@@ -5,6 +5,7 @@ export interface RistPeer {
   avgRtt: number;        // ms
   bitrate: number;       // bps
   avgBitrate: number;    // bps
+  ip?: string | null;    // peer IP:port from ristreceiver stats (if available)
 }
 
 export interface RistFlow {
@@ -19,4 +20,9 @@ export interface RistFlow {
   bitrate: number;           // bps (flow-level)
   avgBufferTime: number;     // ms
   peers: RistPeer[];
+}
+
+/** A flow that has gone inactive and moved to history */
+export interface HistoryFlow extends RistFlow {
+  disappearedAt: number;   // Unix timestamp ms
 }

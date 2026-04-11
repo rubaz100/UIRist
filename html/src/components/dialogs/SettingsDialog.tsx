@@ -12,11 +12,12 @@ interface SettingsDialogProps {
 
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost } = useSettings();
+  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost, flowHistoryTimeout, setFlowHistoryTimeout } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
   const [localRistApiUrl, setLocalRistApiUrl] = useState('');
   const [localRistApiKey, setLocalRistApiKey] = useState('');
   const [localRistServerHost, setLocalRistServerHost] = useState('');
+  const [localFlowHistoryTimeout, setLocalFlowHistoryTimeout] = useState('30');
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -25,15 +26,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
       setLocalRistApiUrl(ristApiUrl);
       setLocalRistApiKey(ristApiKey);
       setLocalRistServerHost(ristServerHost);
+      setLocalFlowHistoryTimeout(String(flowHistoryTimeout));
       setSuccess(false);
     }
-  }, [open, apiKey, ristApiUrl, ristApiKey]);
+  }, [open, apiKey, ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout]);
 
   const handleSave = () => {
     setApiKey(localApiKey);
     setRistApiUrl(localRistApiUrl);
     setRistApiKey(localRistApiKey);
     setRistServerHost(localRistServerHost);
+    const t = parseInt(localFlowHistoryTimeout, 10);
+    setFlowHistoryTimeout(isNaN(t) || t < 0 ? 0 : t);
     setSuccess(true);
     setTimeout(() => { onClose(); }, 1000);
   };
@@ -99,6 +103,22 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
             placeholder="Enter your RIST API key"
             helpText="The RIST_API_KEY set in your server's .env file"
           />
+
+          <hr />
+
+          <Form.Group className="mb-3">
+            <Form.Label>Flow History Timeout <span className="text-muted">(seconds)</span></Form.Label>
+            <Form.Control
+              type="number"
+              min={0}
+              value={localFlowHistoryTimeout}
+              onChange={e => setLocalFlowHistoryTimeout(e.target.value)}
+              placeholder="30"
+            />
+            <Form.Text className="text-muted">
+              Move a RIST flow to history after this many seconds with 0 active connections. Set to <code>0</code> to disable.
+            </Form.Text>
+          </Form.Group>
 
           <hr />
 

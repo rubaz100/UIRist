@@ -5,7 +5,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { apiService } from '../services/api.service';
 import { StreamId } from '../types/api.types';
 import { PublisherCard } from '../components/publisher';
-import { RistFlowCard, AddReceiverDialog, ReceiverCard } from '../components/rist';
+import { RistFlowCard, RistFlowHistoryCard, AddReceiverDialog, ReceiverCard } from '../components/rist';
 import { SettingsDialog, SetupDialog } from '../components/dialogs';
 import { useRistStats } from '../hooks/useRistStats';
 import { useRistReceivers } from '../hooks/useRistReceivers';
@@ -13,7 +13,7 @@ import { RefreshTimer } from '../components/ui';
 
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, ristApiKey, ristServerHost } = useSettings();
+  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout } = useSettings();
 
   const resolvedServerHost = ristServerHost || (() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })();
 
@@ -27,8 +27,8 @@ export const PublishersPage: React.FC = () => {
   // ── RIST state ─────────────────────────────────────────────────────────────
   const ristApiConfigured = ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
 
-  const { flows: ristFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
-    useRistStats(ristApiConfigured ? ristApiUrl : '', ristApiKey);
+  const { flows: ristFlows, historyFlows: ristHistoryFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
+    useRistStats(ristApiConfigured ? ristApiUrl : '', ristApiKey, flowHistoryTimeout);
   const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, refresh: refreshReceivers } =
     useRistReceivers(ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
@@ -181,7 +181,7 @@ export const PublishersPage: React.FC = () => {
             )}
           </Col>
 
-          {/* ── SRT ── */}
+          {/* ── SRT + RIST History ── */}
           <Col xs={12} lg={6}>
             <div className="d-flex align-items-center mb-3">
               <h5 className="mb-0"><i className="bi bi-broadcast me-2 text-primary"></i>SRT Publishers</h5>
@@ -212,6 +212,20 @@ export const PublishersPage: React.FC = () => {
               <div>
                 {Object.entries(groupedStreamIds).map(([publisher, ids]) => (
                   <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} />
+                ))}
+              </div>
+            )}
+
+            {/* RIST Flow History */}
+            {ristHistoryFlows.length > 0 && (
+              <div className="mt-4">
+                <h6 className="text-muted mb-2 d-flex align-items-center gap-2">
+                  <i className="bi bi-clock-history"></i>
+                  RIST Flow History
+                  <span className="badge bg-secondary">{ristHistoryFlows.length}</span>
+                </h6>
+                {ristHistoryFlows.map(flow => (
+                  <RistFlowHistoryCard key={`${flow.receiverId}-${flow.flowId}-${flow.disappearedAt}`} flow={flow} />
                 ))}
               </div>
             )}

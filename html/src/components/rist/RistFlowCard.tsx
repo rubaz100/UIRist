@@ -78,12 +78,15 @@ export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
               </span>
             </div>
             <div className="d-flex flex-column gap-1">
-              {flow.peers.map(peer => (
+              {flow.peers.map((peer, index) => (
                 <div key={peer.id} className="d-flex align-items-center gap-2 px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
                   <Badge bg={peer.dead === 0 ? 'success' : 'secondary'} style={{ fontSize: '0.65rem' }}>
                     {peer.dead === 0 ? 'live' : 'dead'}
                   </Badge>
-                  <span className="small text-muted">Peer #{peer.id}</span>
+                  <span className="small text-muted" title={peer.ip ?? undefined}>
+                    Peer #{index + 1}
+                    {peer.ip && <span className="ms-1 text-info font-monospace" style={{ fontSize: '0.7rem' }}>{peer.ip}</span>}
+                  </span>
                   <span className="small ms-auto">
                     <span className="text-muted me-2">RTT</span>
                     <span className={peer.rtt > 200 ? 'text-warning' : ''}>{Math.round(peer.rtt)} ms</span>

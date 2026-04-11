@@ -10,6 +10,8 @@ interface SettingsContextType {
   setRistApiKey: (key: string) => void;
   ristServerHost: string;
   setRistServerHost: (host: string) => void;
+  flowHistoryTimeout: number;         // seconds; 0 = disabled
+  setFlowHistoryTimeout: (s: number) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -21,6 +23,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
   const [ristApiKey, setRistApiKeyState] = useState<string>('');
   const [ristServerHost, setRistServerHostState] = useState<string>(rawRistServerHost);
+  const [flowHistoryTimeout, setFlowHistoryTimeoutState] = useState<number>(30);
 
   useEffect(() => {
     const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
@@ -34,6 +37,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedRistServerHost = localStorage.getItem('rist-server-host');
     if (savedRistServerHost) setRistServerHostState(savedRistServerHost);
+
+    const savedFlowHistoryTimeout = localStorage.getItem('rist-flow-history-timeout');
+    if (savedFlowHistoryTimeout !== null) setFlowHistoryTimeoutState(Number(savedFlowHistoryTimeout));
   }, []);
 
   const setAdvancedMode = (enabled: boolean) => {
@@ -56,12 +62,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     localStorage.setItem('rist-server-host', host);
   };
 
+  const setFlowHistoryTimeout = (s: number) => {
+    setFlowHistoryTimeoutState(s);
+    localStorage.setItem('rist-flow-history-timeout', String(s));
+  };
+
   return (
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
       ristServerHost, setRistServerHost,
+      flowHistoryTimeout, setFlowHistoryTimeout,
     }}>
       {children}
     </SettingsContext.Provider>
