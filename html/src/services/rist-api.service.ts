@@ -16,42 +16,51 @@ export interface HealthResponse {
 
 class RistApiService {
   private baseUrl: string = '';
+  private apiKey: string = '';
 
   setBaseUrl(url: string) {
     this.baseUrl = url.replace(/\/$/, '');
   }
 
+  setApiKey(key: string) {
+    this.apiKey = key;
+  }
+
+  private headers() {
+    return this.apiKey ? { 'X-API-Key': this.apiKey } : {};
+  }
+
   async getHealth(): Promise<HealthResponse> {
-    const res = await axios.get<HealthResponse>(`${this.baseUrl}/health`);
+    const res = await axios.get<HealthResponse>(`${this.baseUrl}/health`, { headers: this.headers() });
     return res.data;
   }
 
   async getReceivers(): Promise<RistReceiver[]> {
-    const res = await axios.get<RistReceiver[]>(`${this.baseUrl}/api/receivers`);
+    const res = await axios.get<RistReceiver[]>(`${this.baseUrl}/api/receivers`, { headers: this.headers() });
     return res.data;
   }
 
   async createReceiver(payload: CreateReceiverPayload): Promise<RistReceiver> {
-    const res = await axios.post<RistReceiver>(`${this.baseUrl}/api/receivers`, payload);
+    const res = await axios.post<RistReceiver>(`${this.baseUrl}/api/receivers`, payload, { headers: this.headers() });
     return res.data;
   }
 
   async deleteReceiver(id: string): Promise<void> {
-    await axios.delete(`${this.baseUrl}/api/receivers/${id}`);
+    await axios.delete(`${this.baseUrl}/api/receivers/${id}`, { headers: this.headers() });
   }
 
   async getStats(): Promise<RistFlow[]> {
-    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/stats`);
+    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/stats`, { headers: this.headers() });
     return res.data.flows;
   }
 
   async getReceiverStats(id: string): Promise<RistFlow[]> {
-    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/receivers/${id}/stats`);
+    const res = await axios.get<RistStatsResponse>(`${this.baseUrl}/api/receivers/${id}/stats`, { headers: this.headers() });
     return res.data.flows;
   }
 
   async getReceiverLogs(id: string): Promise<string[]> {
-    const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${id}/logs`);
+    const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${id}/logs`, { headers: this.headers() });
     return res.data.logs;
   }
 }

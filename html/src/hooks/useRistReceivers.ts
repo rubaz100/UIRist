@@ -12,7 +12,7 @@ interface UseRistReceiversResult {
   refresh: () => void;
 }
 
-export const useRistReceivers = (apiUrl: string): UseRistReceiversResult => {
+export const useRistReceivers = (apiUrl: string, apiKey: string = ''): UseRistReceiversResult => {
   const [receivers, setReceivers] = useState<RistReceiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,21 +23,23 @@ export const useRistReceivers = (apiUrl: string): UseRistReceiversResult => {
       return;
     }
     ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
     try {
       const data = await ristApiService.getReceivers();
       setReceivers(data);
       setError(null);
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to fetch receivers');
+      setError(err?.response?.data?.error ?? err?.message ?? 'Failed to fetch receivers');
     } finally {
       setLoading(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, apiKey]);
 
   useEffect(() => { fetchReceivers(); }, [fetchReceivers]);
 
   const createReceiver = async (payload: CreateReceiverPayload): Promise<RistReceiver> => {
     ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
     const rec = await ristApiService.createReceiver(payload);
     setReceivers(prev => [...prev, rec]);
     return rec;
@@ -45,6 +47,7 @@ export const useRistReceivers = (apiUrl: string): UseRistReceiversResult => {
 
   const deleteReceiver = async (id: string): Promise<void> => {
     ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
     await ristApiService.deleteReceiver(id);
     setReceivers(prev => prev.filter(r => r.id !== id));
   };

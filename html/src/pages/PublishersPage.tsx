@@ -91,7 +91,7 @@ const ServiceSelector: React.FC<{
 // ── Main page ────────────────────────────────────────────────────────────────
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, enabledServices, setEnabledServices } = useSettings();
+  const { ristApiUrl, ristApiKey, enabledServices, setEnabledServices } = useSettings();
 
   // ── SRT state ──────────────────────────────────────────────────────────────
   const [streamIds, setStreamIds] = useState<StreamId[]>([]);
@@ -107,9 +107,9 @@ export const PublishersPage: React.FC = () => {
   const ristApiConfigured = ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
 
   const { flows: ristFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
-    useRistStats(ristEnabled && ristApiConfigured ? ristApiUrl : '');
+    useRistStats(ristEnabled && ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, refresh: refreshReceivers } =
-    useRistReceivers(ristEnabled && ristApiConfigured ? ristApiUrl : '');
+    useRistReceivers(ristEnabled && ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
   const [receiversExpanded, setReceiversExpanded] = useState(false);
 

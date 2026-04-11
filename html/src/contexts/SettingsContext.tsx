@@ -8,6 +8,8 @@ interface SettingsContextType {
   setAdvancedMode: (enabled: boolean) => void;
   ristApiUrl: string;
   setRistApiUrl: (url: string) => void;
+  ristApiKey: string;
+  setRistApiKey: (key: string) => void;
   enabledServices: ServiceType[];
   setEnabledServices: (services: ServiceType[]) => void;
 }
@@ -18,6 +20,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
+  const [ristApiKey, setRistApiKeyState] = useState<string>('');
   const [enabledServices, setEnabledServicesState] = useState<ServiceType[]>([]);
 
   useEffect(() => {
@@ -26,6 +29,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedRistApiUrl = localStorage.getItem('rist-api-url');
     if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
+
+    const savedRistApiKey = localStorage.getItem('rist-api-key');
+    if (savedRistApiKey) setRistApiKeyState(savedRistApiKey);
 
     const savedServices = localStorage.getItem('enabled-services');
     if (savedServices) {
@@ -43,6 +49,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     localStorage.setItem('rist-api-url', url);
   };
 
+  const setRistApiKey = (key: string) => {
+    setRistApiKeyState(key);
+    localStorage.setItem('rist-api-key', key);
+  };
+
   const setEnabledServices = (services: ServiceType[]) => {
     setEnabledServicesState(services);
     localStorage.setItem('enabled-services', JSON.stringify(services));
@@ -52,6 +63,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
       ristApiUrl, setRistApiUrl,
+      ristApiKey, setRistApiKey,
       enabledServices, setEnabledServices,
     }}>
       {children}

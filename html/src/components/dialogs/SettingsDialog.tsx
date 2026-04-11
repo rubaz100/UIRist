@@ -5,34 +5,32 @@ import { useSettings } from '../../contexts/SettingsContext';
 import config from '../../config';
 import { AdvancedModeToggle, HideField } from '../form';
 
-// Props for SettingsDialog component
 interface SettingsDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
-// Settings dialog component for API configuration
-export const SettingsDialog: React.FC<SettingsDialogProps> = ({
-  open,
-  onClose,
-}) => {
+export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl } = useSettings();
+  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
   const [localRistApiUrl, setLocalRistApiUrl] = useState('');
+  const [localRistApiKey, setLocalRistApiKey] = useState('');
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     if (open) {
       setLocalApiKey(apiKey || '');
       setLocalRistApiUrl(ristApiUrl);
+      setLocalRistApiKey(ristApiKey);
       setSuccess(false);
     }
-  }, [open, apiKey, ristApiUrl]);
+  }, [open, apiKey, ristApiUrl, ristApiKey]);
 
   const handleSave = () => {
     setApiKey(localApiKey);
     setRistApiUrl(localRistApiUrl);
+    setRistApiKey(localRistApiKey);
     setSuccess(true);
     setTimeout(() => { onClose(); }, 1000);
   };
@@ -42,35 +40,28 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <Modal.Header closeButton>
         <Modal.Title>Settings</Modal.Title>
       </Modal.Header>
-      
+
       <Modal.Body>
-        {success && (
-          <Alert variant="success" className="mb-3">
-            Settings saved successfully!
-          </Alert>
-        )}
-        
+        {success && <Alert variant="success" className="mb-3">Settings saved successfully!</Alert>}
+
         <Form>
           <Form.Group className="mb-3">
             <Form.Label>Server URL</Form.Label>
-            <Form.Control
-              type="text"
-              value={config.apiEndpoint}
-              readOnly
-              disabled
-            />
+            <Form.Control type="text" value={config.apiEndpoint} readOnly disabled />
             <Form.Text className="text-muted">
               The server URL is configured at build time or via runtime configuration.
             </Form.Text>
           </Form.Group>
-          
+
           <HideField
-            label="API Key"
+            label="SRT API Key"
             value={localApiKey}
             onChange={setLocalApiKey}
-            placeholder="Enter your API key"
+            placeholder="Enter your SRT API key"
             helpText="Your SRT Live Server API key for authentication"
           />
+
+          <hr />
 
           <Form.Group className="mb-3">
             <Form.Label>RIST API URL</Form.Label>
@@ -81,31 +72,28 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               placeholder="http://localhost:3001"
             />
             <Form.Text className="text-muted">
-              URL of the UIRist API server (<code>node api/server.js</code>).
-              Manages ristreceiver processes and provides flow stats.
+              URL of the UIRist API server. Manages ristreceiver processes and flow stats.
             </Form.Text>
           </Form.Group>
 
+          <HideField
+            label="RIST API Key"
+            value={localRistApiKey}
+            onChange={setLocalRistApiKey}
+            placeholder="Enter your RIST API key"
+            helpText="The RIST_API_KEY set in your server's .env file"
+          />
+
           <hr />
 
-          <AdvancedModeToggle
-            checked={advancedMode}
-            onChange={setAdvancedMode}
-          />
+          <AdvancedModeToggle checked={advancedMode} onChange={setAdvancedMode} />
         </Form>
       </Modal.Body>
-      
+
       <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button 
-          variant="primary"
-          onClick={handleSave}
-        >
-          Save
-        </Button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" onClick={handleSave}>Save</Button>
       </Modal.Footer>
     </Modal>
   );
-}; 
+};

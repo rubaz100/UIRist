@@ -12,7 +12,7 @@ interface UseRistStatsResult {
   secondsUntilUpdate: number;
 }
 
-export const useRistStats = (apiUrl: string): UseRistStatsResult => {
+export const useRistStats = (apiUrl: string, apiKey: string = ''): UseRistStatsResult => {
   const [flows, setFlows] = useState<RistFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +25,7 @@ export const useRistStats = (apiUrl: string): UseRistStatsResult => {
     }
 
     ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
     try {
       const data = await ristApiService.getStats();
       setFlows(data);
@@ -40,7 +41,7 @@ export const useRistStats = (apiUrl: string): UseRistStatsResult => {
     } finally {
       setLoading(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, apiKey]);
 
   useEffect(() => {
     fetchFlows();
