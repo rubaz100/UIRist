@@ -58,7 +58,7 @@ export const useRistStats = (
       }
 
       // Flows that vanished from API entirely also start their countdown
-      for (const [key] of lastKnownRef.current) {
+      for (const key of Array.from(lastKnownRef.current.keys())) {
         if (!currentKeys.has(key) && !inactiveSinceRef.current.has(key)) {
           inactiveSinceRef.current.set(key, now);
         }
