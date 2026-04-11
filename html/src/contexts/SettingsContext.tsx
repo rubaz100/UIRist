@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import config from '../config';
 
-export type ServiceType = 'srt' | 'rist';
-
 interface SettingsContextType {
   advancedMode: boolean;
   setAdvancedMode: (enabled: boolean) => void;
@@ -10,8 +8,6 @@ interface SettingsContextType {
   setRistApiUrl: (url: string) => void;
   ristApiKey: string;
   setRistApiKey: (key: string) => void;
-  enabledServices: ServiceType[];
-  setEnabledServices: (services: ServiceType[]) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -21,7 +17,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
   const [ristApiKey, setRistApiKeyState] = useState<string>('');
-  const [enabledServices, setEnabledServicesState] = useState<ServiceType[]>([]);
 
   useEffect(() => {
     const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
@@ -32,11 +27,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedRistApiKey = localStorage.getItem('rist-api-key');
     if (savedRistApiKey) setRistApiKeyState(savedRistApiKey);
-
-    const savedServices = localStorage.getItem('enabled-services');
-    if (savedServices) {
-      try { setEnabledServicesState(JSON.parse(savedServices)); } catch {}
-    }
   }, []);
 
   const setAdvancedMode = (enabled: boolean) => {
@@ -54,17 +44,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     localStorage.setItem('rist-api-key', key);
   };
 
-  const setEnabledServices = (services: ServiceType[]) => {
-    setEnabledServicesState(services);
-    localStorage.setItem('enabled-services', JSON.stringify(services));
-  };
-
   return (
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
-      enabledServices, setEnabledServices,
     }}>
       {children}
     </SettingsContext.Provider>
