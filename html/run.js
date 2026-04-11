@@ -44,10 +44,10 @@ if (process.env.REACT_APP_SRTLA_PORT) {
 } else {
     console.log(`  SRTLA_PORT: (not configured)`);
 }
-if (process.env.REACT_APP_RIST_METRICS_URL) {
-    console.log(`  RIST_METRICS_URL: ${process.env.REACT_APP_RIST_METRICS_URL}`);
+if (process.env.REACT_APP_RIST_API_URL) {
+    console.log(`  RIST_API_URL: ${process.env.REACT_APP_RIST_API_URL}`);
 } else {
-    console.log(`  RIST_METRICS_URL: (not configured)`);
+    console.log(`  RIST_API_URL: (not configured)`);
 }
 
 // Replace placeholders in all files
@@ -63,7 +63,7 @@ files.forEach(filepath => {
         .replaceAll('{{SRT_SENDER_PORT}}', process.env.REACT_APP_SRT_SENDER_PORT)
         .replaceAll('{{SLS_STATS_PORT}}', process.env.REACT_APP_SLS_STATS_PORT)
         .replaceAll('{{SRTLA_PORT}}', process.env.REACT_APP_SRTLA_PORT)
-        .replaceAll('{{RIST_METRICS_URL}}', process.env.REACT_APP_RIST_METRICS_URL);
+        .replaceAll('{{RIST_API_URL}}', process.env.REACT_APP_RIST_API_URL);
 
     fs.writeFileSync(filepath, newContent);
 });

@@ -1,5 +1,5 @@
 services:
-  node:
+  ui:
     build:
       context: .
       dockerfile: docker/development.Dockerfile
@@ -11,6 +11,18 @@ services:
       REACT_APP_SRT_SENDER_PORT: "${SRT_SENDER_PORT:-4001}"
       REACT_APP_SLS_STATS_PORT: "${SLS_STATS_PORT:-8080}"
       REACT_APP_SRTLA_PORT: "${SRTLA_PORT}"
-      REACT_APP_RIST_METRICS_URL: "${RIST_METRICS_URL}"
+      REACT_APP_RIST_API_URL: "${RIST_API_URL:-http://localhost:3001}"
     ports:
       - "3000:3000"
+
+  rist-api:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./api:/app
+    command: node server.js
+    environment:
+      RIST_API_PORT: "3001"
+      RISTRECEIVER_BIN: "/usr/bin/ristreceiver"
+    ports:
+      - "3001:3001"

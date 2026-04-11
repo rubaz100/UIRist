@@ -1,64 +1,46 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import config from '../config';
 
-// Settings context interface
 interface SettingsContextType {
   advancedMode: boolean;
   setAdvancedMode: (enabled: boolean) => void;
-  ristMetricsUrl: string;
-  setRistMetricsUrl: (url: string) => void;
+  ristApiUrl: string;
+  setRistApiUrl: (url: string) => void;
 }
 
-// Create context
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-// Settings Provider component
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
-  const [ristMetricsUrl, setRistMetricsUrlState] = useState<string>(config.ristMetricsUrl);
+  const [ristApiUrl, setRistApiUrlState] = useState<string>(config.ristApiUrl);
 
-  // Load settings from localStorage on mount
   useEffect(() => {
     const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
-    if (savedAdvancedMode === 'true') {
-      setAdvancedModeState(true);
-    }
-    const savedRistUrl = localStorage.getItem('rist-metrics-url');
-    if (savedRistUrl) {
-      setRistMetricsUrlState(savedRistUrl);
-    }
+    if (savedAdvancedMode === 'true') setAdvancedModeState(true);
+
+    const savedRistApiUrl = localStorage.getItem('rist-api-url');
+    if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
   }, []);
 
-  // Set advanced mode and save to localStorage
   const setAdvancedMode = (enabled: boolean) => {
     setAdvancedModeState(enabled);
     localStorage.setItem('srt-advanced-mode', enabled.toString());
   };
 
-  const setRistMetricsUrl = (url: string) => {
-    setRistMetricsUrlState(url);
-    localStorage.setItem('rist-metrics-url', url);
+  const setRistApiUrl = (url: string) => {
+    setRistApiUrlState(url);
+    localStorage.setItem('rist-api-url', url);
   };
 
   return (
-    <SettingsContext.Provider
-      value={{
-        advancedMode,
-        setAdvancedMode,
-        ristMetricsUrl,
-        setRistMetricsUrl,
-      }}
-    >
+    <SettingsContext.Provider value={{ advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl }}>
       {children}
     </SettingsContext.Provider>
   );
 };
 
-// Custom hook to use settings context
 export const useSettings = () => {
   const context = useContext(SettingsContext);
-  if (context === undefined) {
-    throw new Error('useSettings must be used within a SettingsProvider');
-  }
+  if (context === undefined) throw new Error('useSettings must be used within a SettingsProvider');
   return context;
-}; 
+};

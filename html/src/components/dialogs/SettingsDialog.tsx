@@ -17,28 +17,24 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   onClose,
 }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, ristMetricsUrl, setRistMetricsUrl } = useSettings();
+  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
-  const [localRistUrl, setLocalRistUrl] = useState('');
+  const [localRistApiUrl, setLocalRistApiUrl] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Initialize local state when dialog opens
   useEffect(() => {
     if (open) {
       setLocalApiKey(apiKey || '');
-      setLocalRistUrl(ristMetricsUrl);
+      setLocalRistApiUrl(ristApiUrl);
       setSuccess(false);
     }
-  }, [open, apiKey, ristMetricsUrl]);
+  }, [open, apiKey, ristApiUrl]);
 
-  // Handle save
   const handleSave = () => {
     setApiKey(localApiKey);
-    setRistMetricsUrl(localRistUrl);
+    setRistApiUrl(localRistApiUrl);
     setSuccess(true);
-    setTimeout(() => {
-      onClose();
-    }, 1000);
+    setTimeout(() => { onClose(); }, 1000);
   };
 
   return (
@@ -77,16 +73,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           />
 
           <Form.Group className="mb-3">
-            <Form.Label>RIST Metrics URL</Form.Label>
+            <Form.Label>RIST API URL</Form.Label>
             <Form.Control
               type="text"
-              value={localRistUrl}
-              onChange={e => setLocalRistUrl(e.target.value)}
-              placeholder="http://your-rist-server:9100/metrics"
+              value={localRistApiUrl}
+              onChange={e => setLocalRistApiUrl(e.target.value)}
+              placeholder="http://localhost:3001"
             />
             <Form.Text className="text-muted">
-              Prometheus /metrics endpoint of your ristreceiver instance.
-              Must be CORS-accessible (e.g. via nginx proxy).
+              URL of the UIRist API server (<code>node api/server.js</code>).
+              Manages ristreceiver processes and provides flow stats.
             </Form.Text>
           </Form.Group>
 
