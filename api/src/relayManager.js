@@ -21,10 +21,11 @@ async function startRelay(receiverId, outputUrl, srtPort) {
 
   const args = [
     '-hide_banner', '-loglevel', 'warning',
-    '-i', `udp://0.0.0.0:${udpPort}`,
+    '-fflags', 'nobuffer',
+    '-i', `udp://0.0.0.0:${udpPort}?fifo_size=5000000&overrun_nonfatal=1`,
     '-c', 'copy',
     '-f', 'mpegts',
-    `srt://0.0.0.0:${srtPort}?mode=listener`,
+    `srt://0.0.0.0:${srtPort}?mode=listener&latency=200000`,
   ];
 
   const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
