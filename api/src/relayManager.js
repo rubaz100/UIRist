@@ -21,7 +21,9 @@ async function startRelay(receiverId, outputUrl, srtPort) {
 
   const args = [
     '-hide_banner', '-loglevel', 'warning',
-    '-fflags', 'nobuffer',
+    '-probesize', '32',
+    '-analyzeduration', '0',
+    '-fflags', 'nobuffer+igndts',
     '-i', `udp://0.0.0.0:${udpPort}?fifo_size=5000000&overrun_nonfatal=1`,
     '-c', 'copy',
     '-f', 'mpegts',
