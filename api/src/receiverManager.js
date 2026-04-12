@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { startSocketServer, stopSocketServer, getPeerIps } = require('./metricsServer');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState } = require('./stateManager');
+const { getRelay, stopRelay: stopReceiverRelay } = require('./relayManager');
 const { isUdpPortAvailable } = require('./portChecker');
 const log = require('./logger');
 
@@ -118,6 +119,7 @@ function stopReceiver(id) {
   if (rec._proc) rec._proc.kill('SIGTERM');
   stopSocketServer(rec.socketPath);
   closePort(rec.listenPort, 'udp');
+  stopReceiverRelay(id); // stop ffmpeg relay if running
   rec.status = 'stopped';
   receivers.delete(id);
   log.info('Receiver stopped', { id, name: rec.name });
@@ -204,7 +206,10 @@ function getReceiver(id) {
   return rec ? toPublic(rec) : null;
 }
 
-function toPublic({ _proc, ...pub }) { return pub; }
+function toPublic({ _proc, ...pub }) {
+  const relay = getRelay(pub.id);
+  return relay ? { ...pub, relay } : { ...pub, relay: null };
+}
 
 function getBinaryStatus() {
   return { available: !!BINARY, path: BINARY || null };

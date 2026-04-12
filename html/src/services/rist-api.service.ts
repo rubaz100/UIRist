@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { RistReceiver, RistStatsResponse } from '../types/rist-receiver.types';
+import { RistReceiver, RistRelay, RistStatsResponse } from '../types/rist-receiver.types';
 import { RistFlow } from '../types/rist.types';
 
 export interface CreateReceiverPayload {
@@ -81,6 +81,15 @@ class RistApiService {
   async getUsedPorts(): Promise<{ receiverPorts: number[]; reservedPorts: number[] }> {
     const res = await axios.get(`${this.baseUrl}/api/ports/used`, this.opts());
     return res.data;
+  }
+
+  async startRelay(receiverId: string, srtPort: number): Promise<RistRelay> {
+    const res = await axios.post<RistRelay>(`${this.baseUrl}/api/receivers/${receiverId}/relay`, { srtPort }, this.opts());
+    return res.data;
+  }
+
+  async stopRelay(receiverId: string): Promise<void> {
+    await axios.delete(`${this.baseUrl}/api/receivers/${receiverId}/relay`, this.opts());
   }
 }
 

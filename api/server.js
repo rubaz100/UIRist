@@ -8,6 +8,7 @@ const {
   startReceiver, stopReceiver, listReceivers, getReceiver,
   getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
 } = require('./src/receiverManager');
+const { startRelay, stopRelay, getRelay } = require('./src/relayManager');
 
 const app = express();
 const PORT = process.env.RIST_API_PORT || 3001;
@@ -154,6 +155,43 @@ app.post('/api/receivers', auth, createLimiter, async (req, res) => {
 app.delete('/api/receivers/:id', auth, (req, res) => {
   const ok = stopReceiver(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Receiver not found' });
+  res.json({ success: true });
+});
+
+// ── Relay (ffmpeg UDP → SRT listener) ────────────────────────────────────────
+app.get('/api/receivers/:id/relay', auth, (req, res) => {
+  const relay = getRelay(req.params.id);
+  if (!relay) return res.status(404).json({ error: 'No relay running for this receiver' });
+  res.json(relay);
+});
+
+app.post('/api/receivers/:id/relay', auth, async (req, res) => {
+  const rec = getReceiver(req.params.id);
+  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
+
+  const { srtPort } = req.body || {};
+  if (!srtPort || typeof srtPort !== 'number' || srtPort < 1 || srtPort > 65535) {
+    return res.status(400).json({ error: 'srtPort must be a number between 1 and 65535' });
+  }
+  if (RESERVED_PORTS.has(srtPort)) {
+    return res.status(400).json({ error: `Port ${srtPort} is reserved` });
+  }
+  if (getUsedPorts().includes(srtPort)) {
+    return res.status(400).json({ error: `Port ${srtPort} is already used by a receiver` });
+  }
+
+  try {
+    const relay = await startRelay(req.params.id, rec.outputUrl, srtPort);
+    res.status(201).json(relay);
+  } catch (err) {
+    log.error('Failed to start relay', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/receivers/:id/relay', auth, (req, res) => {
+  const ok = stopRelay(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'No relay found for this receiver' });
   res.json({ success: true });
 });
 

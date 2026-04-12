@@ -29,7 +29,7 @@ export const PublishersPage: React.FC = () => {
 
   const { flows: ristFlows, historyFlows: ristHistoryFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
     useRistStats(ristApiConfigured ? ristApiUrl : '', ristApiKey, flowHistoryTimeout);
-  const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, refresh: refreshReceivers } =
+  const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, startRelay, stopRelay, refresh: refreshReceivers } =
     useRistReceivers(ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
   const [receiversExpanded, setReceiversExpanded] = useState(false);
@@ -135,7 +135,16 @@ export const PublishersPage: React.FC = () => {
                   ) : receivers.length === 0 ? (
                     <p className="text-muted small mb-0">No receivers running. Click Add to start one.</p>
                   ) : (
-                    receivers.map(r => <ReceiverCard key={r.id} receiver={r} serverHost={resolvedServerHost} onDelete={deleteReceiver} />)
+                    receivers.map(r => (
+                      <ReceiverCard
+                        key={r.id}
+                        receiver={r}
+                        serverHost={resolvedServerHost}
+                        onDelete={deleteReceiver}
+                        onStartRelay={startRelay}
+                        onStopRelay={stopRelay}
+                      />
+                    ))
                   )}
                 </div>
               </Collapse>

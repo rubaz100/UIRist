@@ -9,6 +9,8 @@ interface UseRistReceiversResult {
   error: string | null;
   createReceiver: (payload: CreateReceiverPayload) => Promise<RistReceiver>;
   deleteReceiver: (id: string) => Promise<void>;
+  startRelay: (receiverId: string, srtPort: number) => Promise<void>;
+  stopRelay: (receiverId: string) => Promise<void>;
   refresh: () => void;
 }
 
@@ -52,5 +54,19 @@ export const useRistReceivers = (apiUrl: string, apiKey: string = ''): UseRistRe
     setReceivers(prev => prev.filter(r => r.id !== id));
   };
 
-  return { receivers, loading, error, createReceiver, deleteReceiver, refresh: fetchReceivers };
+  const startRelay = async (receiverId: string, srtPort: number): Promise<void> => {
+    ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
+    const relay = await ristApiService.startRelay(receiverId, srtPort);
+    setReceivers(prev => prev.map(r => r.id === receiverId ? { ...r, relay } : r));
+  };
+
+  const stopRelay = async (receiverId: string): Promise<void> => {
+    ristApiService.setBaseUrl(apiUrl);
+    ristApiService.setApiKey(apiKey);
+    await ristApiService.stopRelay(receiverId);
+    setReceivers(prev => prev.map(r => r.id === receiverId ? { ...r, relay: null } : r));
+  };
+
+  return { receivers, loading, error, createReceiver, deleteReceiver, startRelay, stopRelay, refresh: fetchReceivers };
 };
