@@ -83,6 +83,11 @@ class RistApiService {
     return res.data;
   }
 
+  async getRelayLogs(receiverId: string): Promise<string[]> {
+    const res = await axios.get<{ logs: string[] }>(`${this.baseUrl}/api/receivers/${receiverId}/relay/logs`, this.opts());
+    return res.data.logs;
+  }
+
   async startRelay(receiverId: string, srtPort: number): Promise<RistRelay> {
     const res = await axios.post<RistRelay>(`${this.baseUrl}/api/receivers/${receiverId}/relay`, { srtPort }, this.opts());
     return res.data;

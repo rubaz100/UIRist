@@ -4,6 +4,8 @@ import config from '../config';
 interface SettingsContextType {
   advancedMode: boolean;
   setAdvancedMode: (enabled: boolean) => void;
+  developerMode: boolean;
+  setDeveloperMode: (enabled: boolean) => void;
   ristApiUrl: string;
   setRistApiUrl: (url: string) => void;
   ristApiKey: string;
@@ -18,6 +20,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
+  const [developerMode, setDeveloperModeState] = useState<boolean>(false);
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
   const rawRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
@@ -28,6 +31,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
     if (savedAdvancedMode === 'true') setAdvancedModeState(true);
+
+    const savedDeveloperMode = localStorage.getItem('developer-mode');
+    if (savedDeveloperMode === 'true') setDeveloperModeState(true);
 
     const savedRistApiUrl = localStorage.getItem('rist-api-url');
     if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
@@ -45,6 +51,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const setAdvancedMode = (enabled: boolean) => {
     setAdvancedModeState(enabled);
     localStorage.setItem('srt-advanced-mode', enabled.toString());
+  };
+
+  const setDeveloperMode = (enabled: boolean) => {
+    setDeveloperModeState(enabled);
+    localStorage.setItem('developer-mode', enabled.toString());
   };
 
   const setRistApiUrl = (url: string) => {
@@ -70,6 +81,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   return (
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
+      developerMode, setDeveloperMode,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
       ristServerHost, setRistServerHost,

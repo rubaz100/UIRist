@@ -8,7 +8,7 @@ const {
   startReceiver, stopReceiver, listReceivers, getReceiver,
   getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
 } = require('./src/receiverManager');
-const { startRelay, stopRelay, getRelay } = require('./src/relayManager');
+const { startRelay, stopRelay, getRelay, getRelayLogs } = require('./src/relayManager');
 
 const app = express();
 const PORT = process.env.RIST_API_PORT || 3001;
@@ -163,6 +163,12 @@ app.get('/api/receivers/:id/relay', auth, (req, res) => {
   const relay = getRelay(req.params.id);
   if (!relay) return res.status(404).json({ error: 'No relay running for this receiver' });
   res.json(relay);
+});
+
+app.get('/api/receivers/:id/relay/logs', auth, (req, res) => {
+  const logs = getRelayLogs(req.params.id);
+  if (logs === null) return res.status(404).json({ error: 'No relay running for this receiver' });
+  res.json({ logs });
 });
 
 app.post('/api/receivers/:id/relay', auth, async (req, res) => {

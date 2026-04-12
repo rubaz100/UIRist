@@ -94,6 +94,10 @@ function stopAllRelays() {
   for (const id of Array.from(relays.keys())) stopRelay(id);
 }
 
-function toPublic({ _proc, ...pub }) { return pub; }
+function getRelayLogs(receiverId) {
+  return relays.get(receiverId)?.logs ?? null;
+}
 
-module.exports = { startRelay, stopRelay, getRelay, getAllRelays, stopAllRelays };
+function toPublic({ _proc, logs, ...pub }) { return pub; }
+
+module.exports = { startRelay, stopRelay, getRelay, getRelayLogs, getAllRelays, stopAllRelays };

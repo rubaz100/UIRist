@@ -12,7 +12,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost, flowHistoryTimeout, setFlowHistoryTimeout } = useSettings();
+  const { advancedMode, setAdvancedMode, developerMode, setDeveloperMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost, flowHistoryTimeout, setFlowHistoryTimeout } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
   const [localRistApiUrl, setLocalRistApiUrl] = useState('');
   const [localRistApiKey, setLocalRistApiKey] = useState('');
@@ -123,6 +123,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           <hr />
 
           <AdvancedModeToggle checked={advancedMode} onChange={setAdvancedMode} />
+
+          <Form.Group className="mt-3">
+            <Form.Check
+              type="switch"
+              id="developer-mode-switch"
+              label={<><i className="bi bi-terminal me-2 text-warning"></i><strong>Developer Mode</strong></>}
+              checked={developerMode}
+              onChange={e => setDeveloperMode(e.target.checked)}
+            />
+            <Form.Text className="text-muted">
+              Zeigt Prozess-Logs (ristreceiver + ffmpeg Relay) direkt auf der ReceiverCard.
+            </Form.Text>
+          </Form.Group>
         </Form>
       </Modal.Body>
 

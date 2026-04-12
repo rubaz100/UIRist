@@ -13,7 +13,7 @@ import { RefreshTimer } from '../components/ui';
 
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout } = useSettings();
+  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, developerMode } = useSettings();
 
   const resolvedServerHost = ristServerHost || (() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })();
 
@@ -140,6 +140,7 @@ export const PublishersPage: React.FC = () => {
                         key={r.id}
                         receiver={r}
                         serverHost={resolvedServerHost}
+                        developerMode={developerMode}
                         onDelete={deleteReceiver}
                         onStartRelay={startRelay}
                         onStopRelay={stopRelay}

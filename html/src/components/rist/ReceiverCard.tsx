@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { Card, Badge, Button, OverlayTrigger, Tooltip, Form, InputGroup } from 'react-bootstrap';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Card, Badge, Button, OverlayTrigger, Tooltip, Form, InputGroup, Collapse } from 'react-bootstrap';
 import { RistReceiver } from '../../types/rist-receiver.types';
+import { ristApiService } from '../../services/rist-api.service';
 
 interface ReceiverCardProps {
   receiver: RistReceiver;
   serverHost?: string;
+  developerMode?: boolean;
   onDelete: (id: string) => void;
   onStartRelay: (id: string, srtPort: number) => Promise<void>;
   onStopRelay: (id: string) => Promise<void>;
@@ -48,12 +50,43 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, onDelete, onStartRelay, onStopRelay }) => {
+export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onStartRelay, onStopRelay }) => {
   const host = serverHost || 'localhost';
   const ristInputUrl = `rist://${host}:${receiver.listenPort}`;
   const [relayLoading, setRelayLoading] = useState(false);
   const [srtPortInput, setSrtPortInput] = useState('5002');
   const [showRelayInput, setShowRelayInput] = useState(false);
+
+  // Dev mode log state
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'receiver' | 'relay'>('receiver');
+  const [receiverLogs, setReceiverLogs] = useState<string[]>([]);
+  const [relayLogs, setRelayLogs] = useState<string[]>([]);
+  const logBoxRef = useRef<HTMLDivElement>(null);
+
+  const fetchLogs = useCallback(async () => {
+    try {
+      if (activeTab === 'receiver') {
+        const logs = await ristApiService.getReceiverLogs(receiver.id);
+        setReceiverLogs(logs);
+      } else if (receiver.relay) {
+        const logs = await ristApiService.getRelayLogs(receiver.id);
+        setRelayLogs(logs);
+      }
+    } catch {}
+  }, [receiver.id, receiver.relay, activeTab]);
+
+  useEffect(() => {
+    if (!logsOpen || !developerMode) return;
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 2500);
+    return () => clearInterval(interval);
+  }, [logsOpen, developerMode, fetchLogs]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (logBoxRef.current) logBoxRef.current.scrollTop = logBoxRef.current.scrollHeight;
+  }, [receiverLogs, relayLogs]);
 
   const relay = receiver.relay;
   const srtPullUrl = relay ? `srt://${host}:${relay.srtPort}` : null;
@@ -182,6 +215,65 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
             </Button>
           </div>
         </div>
+        {/* Developer Mode Log Panel */}
+        {developerMode && (
+          <div className="mt-2 border-top pt-2">
+            <Button
+              variant="link"
+              size="sm"
+              className="p-0 text-muted text-decoration-none d-flex align-items-center gap-1"
+              onClick={() => setLogsOpen(o => !o)}
+            >
+              <i className="bi bi-terminal" style={{ fontSize: '0.75rem' }}></i>
+              <span style={{ fontSize: '0.75rem' }}>Logs</span>
+              <i className={`bi bi-chevron-${logsOpen ? 'up' : 'down'}`} style={{ fontSize: '0.65rem' }}></i>
+            </Button>
+            <Collapse in={logsOpen}>
+              <div>
+                {/* Tab switcher */}
+                <div className="d-flex gap-2 mt-1 mb-1">
+                  <button
+                    className={`btn btn-link btn-sm p-0 text-decoration-none ${activeTab === 'receiver' ? 'text-info' : 'text-muted'}`}
+                    style={{ fontSize: '0.7rem' }}
+                    onClick={() => setActiveTab('receiver')}
+                  >ristreceiver</button>
+                  <span className="text-muted" style={{ fontSize: '0.7rem' }}>|</span>
+                  <button
+                    className={`btn btn-link btn-sm p-0 text-decoration-none ${activeTab === 'relay' ? 'text-success' : 'text-muted'}`}
+                    style={{ fontSize: '0.7rem' }}
+                    onClick={() => setActiveTab('relay')}
+                    disabled={!receiver.relay}
+                  >ffmpeg relay</button>
+                </div>
+                <div
+                  ref={logBoxRef}
+                  style={{
+                    background: '#0d0d0d',
+                    borderRadius: 4,
+                    padding: '6px 8px',
+                    maxHeight: 180,
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    fontSize: '0.65rem',
+                    lineHeight: 1.5,
+                    color: '#ccc',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {(activeTab === 'receiver' ? receiverLogs : relayLogs).length === 0
+                    ? <span className="text-muted">No logs yet…</span>
+                    : (activeTab === 'receiver' ? receiverLogs : relayLogs).map((line, i) => (
+                        <div key={i} style={{ color: line.includes('ERROR') ? '#f88' : line.includes('WARNING') ? '#fa8' : '#ccc' }}>
+                          {line}
+                        </div>
+                      ))
+                  }
+                </div>
+              </div>
+            </Collapse>
+          </div>
+        )}
       </Card.Body>
     </Card>
   );
