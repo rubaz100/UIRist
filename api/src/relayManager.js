@@ -19,18 +19,13 @@ async function startRelay(receiverId, outputUrl, srtPort) {
     throw new Error('Relay already running for this receiver');
   }
 
+  // srt-live-transmit: simple UDP→SRT relay, no stream probing needed
   const args = [
-    '-hide_banner', '-loglevel', 'warning',
-    '-probesize', '32',
-    '-analyzeduration', '0',
-    '-fflags', 'nobuffer+igndts',
-    '-i', `udp://0.0.0.0:${udpPort}?fifo_size=5000000&overrun_nonfatal=1`,
-    '-c', 'copy',
-    '-f', 'mpegts',
-    `srt://0.0.0.0:${srtPort}?mode=listener&latency=200000`,
+    `udp://:${udpPort}`,
+    `srt://:${srtPort}?mode=listener&latency=200000`,
   ];
 
-  const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const proc = spawn('srt-live-transmit', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
   const relay = {
     receiverId,

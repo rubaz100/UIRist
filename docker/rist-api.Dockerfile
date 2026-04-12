@@ -21,7 +21,7 @@ RUN meson setup build --buildtype=release \
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:22-alpine
 
-RUN apk add --no-cache libstdc++ iptables ffmpeg
+RUN apk add --no-cache libstdc++ iptables srt-tools
 
 # Copy ristreceiver, librist, and the exact mbedtls version used at build time
 COPY --from=builder /usr/local/bin/ristreceiver /usr/local/bin/ristreceiver
