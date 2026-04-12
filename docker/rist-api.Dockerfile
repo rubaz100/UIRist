@@ -1,4 +1,4 @@
-# ── Stage 1: Build librist from source ───────────────────────────────────────
+# ── Stage 1: Build librist + srt-live-transmit from source ───────────────────
 FROM alpine:3.19 AS builder
 
 RUN apk add --no-cache \
@@ -8,25 +8,42 @@ RUN apk add --no-cache \
     git \
     cmake \
     mbedtls-dev \
-    linux-headers
+    linux-headers \
+    openssl-dev
 
+# Build librist
 RUN git clone --depth 1 --branch v0.2.11 \
-    https://code.videolan.org/rist/librist.git /src
-
-WORKDIR /src
+    https://code.videolan.org/rist/librist.git /src/librist
+WORKDIR /src/librist
 RUN meson setup build --buildtype=release \
     && ninja -C build \
     && ninja -C build install
 
+# Build SRT (provides srt-live-transmit)
+RUN git clone --depth 1 --branch v1.5.3 \
+    https://github.com/Haivision/srt.git /src/srt
+WORKDIR /src/srt
+RUN cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_SHARED=ON \
+    -DENABLE_STATIC=OFF \
+    -DENABLE_APPS=ON \
+    && cmake --build build -j$(nproc) \
+    && cmake --install build
+
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:22-alpine
 
-RUN apk add --no-cache libstdc++ iptables srt-tools
+RUN apk add --no-cache libstdc++ iptables openssl
 
-# Copy ristreceiver, librist, and the exact mbedtls version used at build time
+# librist
 COPY --from=builder /usr/local/bin/ristreceiver /usr/local/bin/ristreceiver
-COPY --from=builder /usr/local/lib/librist* /usr/local/lib/
-COPY --from=builder /usr/lib/libmbed* /usr/local/lib/
+COPY --from=builder /usr/local/lib/librist*      /usr/local/lib/
+COPY --from=builder /usr/lib/libmbed*            /usr/local/lib/
+
+# srt-live-transmit
+COPY --from=builder /usr/local/bin/srt-live-transmit /usr/local/bin/srt-live-transmit
+COPY --from=builder /usr/local/lib/libsrt*           /usr/local/lib/
 
 WORKDIR /app
 
