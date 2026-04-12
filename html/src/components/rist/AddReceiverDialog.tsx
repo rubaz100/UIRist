@@ -13,10 +13,10 @@ interface AddReceiverDialogProps {
 
 type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'invalid';
 
-export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '', defaultOutputHost = '127.0.0.1' }) => {
+export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '' }) => {
   const [name, setName] = useState('');
   const [listenPort, setListenPort] = useState('5005');
-  const [outputUrl, setOutputUrl] = useState(`udp://${defaultOutputHost}:5001`);
+  const [outputUrl, setOutputUrl] = useState('srt://0.0.0.0:5002?mode=listener');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [portStatus, setPortStatus] = useState<PortStatus>('idle');
@@ -42,7 +42,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
 
   useEffect(() => {
     if (!open) return;
-    setOutputUrl(`udp://${defaultOutputHost}:5001`);
+    setOutputUrl('srt://0.0.0.0:5002?mode=listener');
     const timer = setTimeout(() => checkPort(listenPort), 400);
     return () => clearTimeout(timer);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -54,7 +54,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
   }, [listenPort, checkPort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = () => {
-    setName(''); setListenPort('5005'); setOutputUrl(`udp://${defaultOutputHost}:5001`);
+    setName(''); setListenPort('5005'); setOutputUrl('srt://0.0.0.0:5002?mode=listener');
     setError(null); setPortStatus('idle');
     onClose();
   };
@@ -133,10 +133,12 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
               type="text"
               value={outputUrl}
               onChange={e => setOutputUrl(e.target.value)}
-              placeholder="udp://127.0.0.1:5001"
+              placeholder="srt://0.0.0.0:5002?mode=listener"
             />
             <Form.Text className="text-muted">
-              Where to forward the decoded stream. Use <code>host.docker.internal</code> to reach the host (e.g. <code>udp://host.docker.internal:5001</code>).
+              <strong>SRT listener</strong> (recommended): <code>srt://0.0.0.0:PORT?mode=listener</code> — VLC/OBS connects to <code>srt://SERVER:PORT</code> to pull the stream.<br />
+              <strong>UDP push</strong>: <code>udp://127.0.0.1:PORT</code> — sends to a local process on the server.<br />
+              The port is opened automatically.
             </Form.Text>
           </Form.Group>
         </Form>
