@@ -34,14 +34,4 @@ async function closePort(port, protocol = 'udp') {
   log.info('iptables: closed', { port, protocol });
 }
 
-/** Parse SRT listener port from output URL, e.g. srt://0.0.0.0:5001?mode=listener → 5001 */
-function srtListenerPort(outputUrl) {
-  if (!outputUrl || !/^srt:\/\//i.test(outputUrl)) return null;
-  if (!outputUrl.toLowerCase().includes('mode=listener')) return null;
-  try {
-    const p = parseInt(new URL(outputUrl.split('?')[0]).port, 10);
-    return p > 0 ? p : null;
-  } catch { return null; }
-}
-
-module.exports = { openPort, closePort, srtListenerPort };
+module.exports = { openPort, closePort };

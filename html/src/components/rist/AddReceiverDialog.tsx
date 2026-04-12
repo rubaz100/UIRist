@@ -16,7 +16,7 @@ type PortStatus = 'idle' | 'checking' | 'available' | 'reserved' | 'used' | 'inv
 export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onClose, onCreate, apiKey = '' }) => {
   const [name, setName] = useState('');
   const [listenPort, setListenPort] = useState('5005');
-  const [outputUrl, setOutputUrl] = useState('srt://0.0.0.0:5002?mode=listener');
+  const [outputUrl, setOutputUrl] = useState('udp://127.0.0.1:5001');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [portStatus, setPortStatus] = useState<PortStatus>('idle');
@@ -42,7 +42,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
 
   useEffect(() => {
     if (!open) return;
-    setOutputUrl('srt://0.0.0.0:5002?mode=listener');
+    setOutputUrl('udp://127.0.0.1:5001');
     const timer = setTimeout(() => checkPort(listenPort), 400);
     return () => clearTimeout(timer);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -54,7 +54,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
   }, [listenPort, checkPort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = () => {
-    setName(''); setListenPort('5005'); setOutputUrl('srt://0.0.0.0:5002?mode=listener');
+    setName(''); setListenPort('5005'); setOutputUrl('udp://127.0.0.1:5001');
     setError(null); setPortStatus('idle');
     onClose();
   };
@@ -133,12 +133,11 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
               type="text"
               value={outputUrl}
               onChange={e => setOutputUrl(e.target.value)}
-              placeholder="srt://0.0.0.0:5002?mode=listener"
+              placeholder="udp://127.0.0.1:5001"
             />
             <Form.Text className="text-muted">
-              <strong>SRT listener</strong> (recommended): <code>srt://0.0.0.0:PORT?mode=listener</code> — VLC/OBS connects to <code>srt://SERVER:PORT</code> to pull the stream.<br />
-              <strong>UDP push</strong>: <code>udp://127.0.0.1:PORT</code> — sends to a local process on the server.<br />
-              The port is opened automatically.
+              <code>udp://HOST:PORT</code> or <code>rtp://HOST:PORT</code> — ristreceiver pushes the decoded stream to this destination.
+              Use <code>udp://127.0.0.1:PORT</code> to send to a local process (e.g. ffmpeg) on the same server.
             </Form.Text>
           </Form.Group>
         </Form>

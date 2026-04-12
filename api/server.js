@@ -54,8 +54,8 @@ const createLimiter = rateLimit({
 // ── Input validation ──────────────────────────────────────────────────────────
 function validateOutputUrl(url) {
   if (typeof url !== 'string' || !url.trim()) return 'outputUrl is required';
-  if (!/^(udp|rtp|srt|rtmp|file):\/\//i.test(url)) {
-    return 'outputUrl must use udp://, rtp://, srt://, rtmp://, or file:// scheme';
+  if (!/^(udp|rtp):\/\//i.test(url)) {
+    return 'outputUrl must use udp:// or rtp:// scheme (ristreceiver only supports UDP/RTP output)';
   }
   if (/[;&|`$(){}[\]\\<>'"!]/.test(url)) return 'outputUrl contains invalid characters';
   return null;

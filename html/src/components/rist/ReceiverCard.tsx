@@ -50,17 +50,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
   const host = serverHost || 'localhost';
   const ristInputUrl = `rist://${host}:${receiver.listenPort}`;
 
-  // If output is SRT listener on 0.0.0.0, show the public pull URL instead
-  const outputDisplay = (() => {
-    const url = receiver.outputUrl;
-    if (/^srt:\/\/(0\.0\.0\.0|::)/i.test(url) && url.toLowerCase().includes('mode=listener')) {
-      try {
-        const port = new URL(url.split('?')[0]).port;
-        return { url: `srt://${host}:${port}`, label: 'SRT Pull URL' };
-      } catch {}
-    }
-    return { url, label: 'Output' };
-  })();
+  const outputDisplay = { url: receiver.outputUrl, label: 'Output' };
 
   return (
     <Card className="mb-2">
