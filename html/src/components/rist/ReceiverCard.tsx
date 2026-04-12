@@ -123,7 +123,11 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
                   </span>
                   <code className="text-success small">{srtPullUrl}</code>
                   <CopyButton text={srtPullUrl} />
-                  <Badge bg={relay!.status === 'running' ? 'success' : 'warning'} className="ms-1" style={{ fontSize: '0.6rem' }}>
+                  <Badge
+                    bg={relay!.status === 'running' ? 'success' : relay!.status === 'error' ? 'danger' : 'warning'}
+                    className="ms-1"
+                    style={{ fontSize: '0.6rem' }}
+                  >
                     {relay!.status}
                   </Badge>
                 </div>

@@ -59,6 +59,8 @@ export const useRistReceivers = (apiUrl: string, apiKey: string = ''): UseRistRe
     ristApiService.setApiKey(apiKey);
     const relay = await ristApiService.startRelay(receiverId, srtPort);
     setReceivers(prev => prev.map(r => r.id === receiverId ? { ...r, relay } : r));
+    // refresh after 1.5s to pick up the updated status (starting → running)
+    setTimeout(fetchReceivers, 1500);
   };
 
   const stopRelay = async (receiverId: string): Promise<void> => {
