@@ -159,18 +159,14 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
           {/* Action buttons */}
           <div className="d-flex flex-column gap-1 flex-shrink-0">
             {!relay && !showRelayInput && (
-              <OverlayTrigger placement="left" overlay={<Tooltip>Start SRT relay for remote viewing</Tooltip>}>
-                <Button variant="outline-success" size="sm" onClick={() => setShowRelayInput(true)}>
-                  <i className="bi bi-cast"></i>
-                </Button>
-              </OverlayTrigger>
+              <Button variant="outline-success" size="sm" onClick={() => setShowRelayInput(true)} title="Start SRT relay for VLC/OBS">
+                <i className="bi bi-cast me-1"></i>SRT
+              </Button>
             )}
             {relay && (
-              <OverlayTrigger placement="left" overlay={<Tooltip>Stop SRT relay</Tooltip>}>
-                <Button variant="outline-warning" size="sm" onClick={handleStopRelay} disabled={relayLoading}>
-                  <i className="bi bi-cast"></i>
-                </Button>
-              </OverlayTrigger>
+              <Button variant="outline-warning" size="sm" onClick={handleStopRelay} disabled={relayLoading} title="Stop SRT relay">
+                <i className="bi bi-cast me-1"></i>Stop
+              </Button>
             )}
             <Button
               variant="outline-danger"

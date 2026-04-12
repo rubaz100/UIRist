@@ -32,7 +32,7 @@ export const PublishersPage: React.FC = () => {
   const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, startRelay, stopRelay, refresh: refreshReceivers } =
     useRistReceivers(ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
-  const [receiversExpanded, setReceiversExpanded] = useState(false);
+  const [receiversExpanded, setReceiversExpanded] = useState(true);
 
   // ── SRT helpers ────────────────────────────────────────────────────────────
   const groupedStreamIds = React.useMemo(() => {
