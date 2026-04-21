@@ -47,7 +47,7 @@ async function startRelay(receiverId, outputUrl, srtPort) {
 
   proc.on('spawn', () => {
     relay.status = 'running';
-    openPort(srtPort, 'tcp');
+    openPort(srtPort, 'udp'); // SRT uses UDP at transport layer
     log.info('Relay started', { receiverId, udpPort, srtPort, pid: proc.pid });
   });
 
@@ -60,7 +60,7 @@ async function startRelay(receiverId, outputUrl, srtPort) {
   proc.on('exit', (code) => {
     relay.status = code === 0 ? 'stopped' : 'error';
     relay.pid = null;
-    closePort(srtPort, 'tcp');
+    closePort(srtPort, 'udp');
     relays.delete(receiverId);
     log.info('Relay exited', { receiverId, code });
   });
@@ -73,7 +73,7 @@ function stopRelay(receiverId) {
   const relay = relays.get(receiverId);
   if (!relay) return false;
   if (relay._proc) relay._proc.kill('SIGTERM');
-  closePort(relay.srtPort, 'tcp');
+  closePort(relay.srtPort, 'udp');
   relays.delete(receiverId);
   log.info('Relay stopped', { receiverId });
   return true;
