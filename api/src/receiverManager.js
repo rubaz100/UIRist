@@ -73,6 +73,8 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     peerIpMap: {}, // peer_id (number) → ip — persists beyond log buffer rollover
   };
 
+  let lastSeenPeerId = null; // correlate "New peer #N" with subsequent auth line
+
   const processChunk = (chunk) => {
     // Split chunk into individual lines — data events can contain multiple lines
     const lines = chunk.toString().split('\n');
@@ -84,12 +86,28 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
       record.logs.push(line);
       if (record.logs.length > 500) record.logs.shift();
 
-      // "Peer 8 will use rist://145.0.0.1:5004 with profile..."
-      // Appears on first connect — gives us peer_id → IP
+      // Pattern 1: "New peer with id #N was configured..."
+      // Appears just before the auth message — capture the peer id
+      const peerIdMatch = line.match(/New peer with id #(\d+)/i);
+      if (peerIdMatch) {
+        lastSeenPeerId = Number(peerIdMatch[1]);
+      }
+
+      // Pattern 2: "...sending oob/api message: auth,IP:PORT,..."
+      // Appears right after Pattern 1 — map the last seen peer id to this IP
+      const authMatch = line.match(/auth,([\d.]+):\d+,/);
+      if (authMatch && lastSeenPeerId !== null) {
+        const ip = authMatch[1];
+        record.peerIpMap[lastSeenPeerId] = ip;
+        log.info('Peer IP mapped', { receiverId: id, peerId: lastSeenPeerId, ip });
+        lastSeenPeerId = null;
+      }
+
+      // Fallback: "Peer N will use rist://IP:PORT..." (some ristreceiver versions)
       const useMatch = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.]+):\d+/i);
       if (useMatch) {
         record.peerIpMap[Number(useMatch[1])] = useMatch[2];
-        log.info('Peer IP mapped', { receiverId: id, peerId: Number(useMatch[1]), ip: useMatch[2] });
+        log.info('Peer IP mapped (fallback)', { receiverId: id, peerId: Number(useMatch[1]), ip: useMatch[2] });
       }
     }
   };
