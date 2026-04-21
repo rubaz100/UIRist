@@ -37,7 +37,7 @@ export const SetupDialog: React.FC<SetupDialogProps> = ({ open, onClose }) => {
     <Modal show={open} onHide={handleSkip} centered backdrop="static">
       <Modal.Header>
         <Modal.Title>
-          <i className="bi bi-broadcast me-2 text-info"></i>Welcome to UIRist
+          <i className="bi bi-broadcast me-2 text-info"></i>Welcome to RISTMonitor
         </Modal.Title>
       </Modal.Header>
 
@@ -60,7 +60,7 @@ export const SetupDialog: React.FC<SetupDialogProps> = ({ open, onClose }) => {
               autoFocus
             />
             <Form.Text className="text-muted">
-              URL of the UIRist API server managing RIST receivers.
+              URL of the RIST Stats Monitor API server managing RIST receivers.
             </Form.Text>
           </Form.Group>
 

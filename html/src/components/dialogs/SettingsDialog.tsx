@@ -68,36 +68,44 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           </Alert>
         )}
 
-        {/* Tab navigation */}
-        <Nav
-          variant="tabs"
-          activeKey={activeTab}
-          onSelect={k => setActiveTab((k as TabKey) || 'srt')}
-          className="px-3 pt-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          <Nav.Item>
-            <Nav.Link eventKey="srt" className="d-flex align-items-center gap-2">
-              <i className="bi bi-broadcast"></i>
-              <span>SRT</span>
-            </Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="rist" className="d-flex align-items-center gap-2">
-              <i className="bi bi-hdd-network"></i>
-              <span>RIST</span>
-            </Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="ui" className="d-flex align-items-center gap-2">
-              <i className="bi bi-sliders"></i>
-              <span>UI</span>
-            </Nav.Link>
-          </Nav.Item>
-        </Nav>
+        {/* Vertical tab layout */}
+        <div className="d-flex" style={{ minHeight: 280 }}>
 
-        {/* Tab content */}
-        <Form className="p-3">
+          {/* Sidebar */}
+          <Nav
+            variant="pills"
+            activeKey={activeTab}
+            onSelect={k => setActiveTab((k as TabKey) || 'srt')}
+            className="flex-column p-2 pt-3"
+            style={{
+              width: 110,
+              flexShrink: 0,
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+              gap: 2,
+            }}
+          >
+            <Nav.Item>
+              <Nav.Link eventKey="srt" className="d-flex align-items-center gap-2 px-2 py-2" style={{ fontSize: '0.85rem' }}>
+                <i className="bi bi-broadcast"></i>
+                <span>SRT</span>
+              </Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="rist" className="d-flex align-items-center gap-2 px-2 py-2" style={{ fontSize: '0.85rem' }}>
+                <i className="bi bi-hdd-network"></i>
+                <span>RIST</span>
+              </Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="ui" className="d-flex align-items-center gap-2 px-2 py-2" style={{ fontSize: '0.85rem' }}>
+                <i className="bi bi-sliders"></i>
+                <span>UI</span>
+              </Nav.Link>
+            </Nav.Item>
+          </Nav>
+
+          {/* Panel */}
+        <Form className="p-3 flex-grow-1">
 
           {/* ── SRT tab ─────────────────────────────────────────── */}
           {activeTab === 'srt' && (
@@ -134,7 +142,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                   placeholder="http://localhost:3001"
                 />
                 <Form.Text className="text-muted">
-                  URL of the UIRist API server that manages ristreceiver processes.
+                  URL of the RIST Stats Monitor API server that manages ristreceiver processes.
                 </Form.Text>
               </Form.Group>
 
@@ -203,6 +211,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           )}
 
         </Form>
+        </div>
       </Modal.Body>
 
       <Modal.Footer>

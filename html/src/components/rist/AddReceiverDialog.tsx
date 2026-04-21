@@ -70,7 +70,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
       return;
     }
     if (portStatus === 'reserved') {
-      setError(`Port ${port} is reserved (used by system or UIRist itself).`);
+      setError(`Port ${port} is reserved (used by system or RISTMonitor itself).`);
       return;
     }
     if (portStatus === 'used') {
@@ -93,7 +93,7 @@ export const AddReceiverDialog: React.FC<AddReceiverDialogProps> = ({ open, onCl
     switch (portStatus) {
       case 'checking':  return <Form.Text className="text-muted">Checking availability…</Form.Text>;
       case 'available': return <Form.Text className="text-success"><i className="bi bi-check-circle me-1"></i>Port is available</Form.Text>;
-      case 'reserved':  return <Form.Text className="text-danger"><i className="bi bi-slash-circle me-1"></i>Reserved — used by system or UIRist</Form.Text>;
+      case 'reserved':  return <Form.Text className="text-danger"><i className="bi bi-slash-circle me-1"></i>Reserved — used by system or RISTMonitor</Form.Text>;
       case 'used':      return <Form.Text className="text-danger"><i className="bi bi-x-circle me-1"></i>Already in use by another receiver</Form.Text>;
       case 'invalid':   return <Form.Text className="text-warning">Enter a valid port (1–65535)</Form.Text>;
       default:          return <Form.Text className="text-muted">RIST streams will be received on this UDP port. Port will be opened automatically.</Form.Text>;

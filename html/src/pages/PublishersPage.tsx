@@ -73,7 +73,7 @@ export const PublishersPage: React.FC = () => {
         <Container fluid>
           <Navbar.Brand href="#">
             <i className="bi bi-broadcast me-2"></i>
-            UIRist
+            RISTMonitor
           </Navbar.Brand>
           <Nav className="ms-auto">
             <Button variant="link" className="nav-link" onClick={() => setSettingsDialogOpen(true)} title="Settings">
@@ -103,7 +103,7 @@ export const PublishersPage: React.FC = () => {
                 <i className="bi bi-link-45deg fs-4"></i>
                 <div className="flex-grow-1">
                   <strong>RIST API URL required</strong>
-                  <div className="small">Configure the URL of the UIRist API server in settings to manage receivers.</div>
+                  <div className="small">Configure the URL of the RIST Stats Monitor API server in settings to manage receivers.</div>
                 </div>
                 <Button variant="warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
                   <i className="bi bi-gear me-1"></i>Settings
