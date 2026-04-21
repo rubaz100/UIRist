@@ -2,8 +2,6 @@ import React from 'react';
 import { Card, Badge } from 'react-bootstrap';
 import { RistFlow } from '../../types/rist.types';
 import { StatItem } from '../publisher/StatItem';
-import { IspBadge } from './IspBadge';
-import { useSettings } from '../../contexts/SettingsContext';
 
 interface RistFlowCardProps {
   flow: RistFlow;
@@ -22,7 +20,6 @@ function formatBitrate(bps: number): string {
 }
 
 export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
-  const { showIspInfo } = useSettings();
   const { color, label } = qualityVariant(flow.qualityRatio);
   const qualityPct = (flow.qualityRatio * 100).toFixed(2);
   const activePeers = flow.peers?.filter(p => p.dead === 0) ?? [];
@@ -86,10 +83,8 @@ export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
                   <Badge bg={peer.dead === 0 ? 'success' : 'secondary'} style={{ fontSize: '0.65rem' }}>
                     {peer.dead === 0 ? 'live' : 'dead'}
                   </Badge>
-                  <span className="small text-muted d-flex align-items-center flex-wrap gap-1" title={peer.ip ?? undefined}>
-                    <span>Peer #{index + 1}</span>
-                    {peer.ip && <span className="text-info font-monospace" style={{ fontSize: '0.7rem' }}>{peer.ip}</span>}
-                    {peer.ip && showIspInfo && <IspBadge ip={peer.ip} />}
+                  <span className="small text-muted">
+                    Peer #{index + 1}
                   </span>
                   <span className="small ms-auto">
                     <span className="text-muted me-2">RTT</span>

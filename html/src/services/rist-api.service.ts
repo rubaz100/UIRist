@@ -73,11 +73,6 @@ class RistApiService {
     return res.data;
   }
 
-  async ipLookup(ip: string): Promise<{ ip: string; isp: string | null; country: string | null; city: string | null }> {
-    const res = await axios.get(`${this.baseUrl}/api/ip-lookup/${encodeURIComponent(ip)}`, this.opts());
-    return res.data;
-  }
-
   async getUsedPorts(): Promise<{ receiverPorts: number[]; reservedPorts: number[] }> {
     const res = await axios.get(`${this.baseUrl}/api/ports/used`, this.opts());
     return res.data;

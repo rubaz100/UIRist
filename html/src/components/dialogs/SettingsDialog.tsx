@@ -12,7 +12,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
   const { apiKey, setApiKey } = useAuth();
-  const { advancedMode, setAdvancedMode, developerMode, setDeveloperMode, showIspInfo, setShowIspInfo, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost, flowHistoryTimeout, setFlowHistoryTimeout } = useSettings();
+  const { advancedMode, setAdvancedMode, developerMode, setDeveloperMode, ristApiUrl, setRistApiUrl, ristApiKey, setRistApiKey, ristServerHost, setRistServerHost, flowHistoryTimeout, setFlowHistoryTimeout } = useSettings();
   const [localApiKey, setLocalApiKey] = useState('');
   const [localRistApiUrl, setLocalRistApiUrl] = useState('');
   const [localRistApiKey, setLocalRistApiKey] = useState('');
@@ -121,19 +121,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           </Form.Group>
 
           <hr />
-
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="switch"
-              id="isp-info-switch"
-              label={<><i className="bi bi-building me-2 text-info"></i><strong>ISP-Info bei Peers anzeigen</strong></>}
-              checked={showIspInfo}
-              onChange={e => setShowIspInfo(e.target.checked)}
-            />
-            <Form.Text className="text-muted">
-              Zeigt Netzbetreiber-Name und Land bei jedem aktiven RIST-Peer. Nutzt ip-api.com (externe Anfrage pro IP).
-            </Form.Text>
-          </Form.Group>
 
           <AdvancedModeToggle checked={advancedMode} onChange={setAdvancedMode} />
 

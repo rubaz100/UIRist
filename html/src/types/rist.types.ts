@@ -5,7 +5,6 @@ export interface RistPeer {
   avgRtt: number;        // ms
   bitrate: number;       // bps
   avgBitrate: number;    // bps
-  ip?: string | null;    // peer IP:port from ristreceiver stats (if available)
 }
 
 export interface RistFlow {

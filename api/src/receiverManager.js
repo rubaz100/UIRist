@@ -1,7 +1,7 @@
 'use strict';
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
-const { startSocketServer, stopSocketServer, getPeerIps } = require('./metricsServer');
+const { startSocketServer, stopSocketServer } = require('./metricsServer');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState } = require('./stateManager');
 const { getRelay, stopRelay: stopReceiverRelay } = require('./relayManager');
@@ -53,7 +53,6 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     '-i', inputUrl,
     '-o', outputUrl,
     '-S', '2000',
-    '-v',               // verbose — needed to log peer addresses on connect
     '-M',
     '--metrics-unix', socketPath,
   ];
@@ -70,11 +69,8 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     pid: proc.pid,
     createdAt: existingCreatedAt || new Date().toISOString(),
     logs: [],
-    peerIpMap: {}, // peer_id (number) → ip — persists beyond log buffer rollover
     lastJsonStats: null, // most recent receiver-stats JSON line — survives log buffer flood
   };
-
-  let lastSeenPeerId = null; // correlate "New peer #N" with subsequent auth line
 
   const processChunk = (chunk) => {
     // Split chunk into individual lines — data events can contain multiple lines
@@ -91,30 +87,6 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
       // so a flood of "Too many old packets" messages can't push it out
       const jsonIdx = line.indexOf('{"receiver-stats"');
       if (jsonIdx !== -1) record.lastJsonStats = line.slice(jsonIdx);
-
-      // Pattern 1: "New peer with id #N was configured..."
-      // Appears just before the auth message — capture the peer id
-      const peerIdMatch = line.match(/New peer with id #(\d+)/i);
-      if (peerIdMatch) {
-        lastSeenPeerId = Number(peerIdMatch[1]);
-      }
-
-      // Pattern 2: "...sending oob/api message: auth,IP:PORT,..."
-      // Appears right after Pattern 1 — map the last seen peer id to this IP
-      const authMatch = line.match(/auth,([\d.]+):\d+,/);
-      if (authMatch && lastSeenPeerId !== null) {
-        const ip = authMatch[1];
-        record.peerIpMap[lastSeenPeerId] = ip;
-        log.info('Peer IP mapped', { receiverId: id, peerId: lastSeenPeerId, ip });
-        lastSeenPeerId = null;
-      }
-
-      // Fallback: "Peer N will use rist://IP:PORT..." (some ristreceiver versions)
-      const useMatch = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.]+):\d+/i);
-      if (useMatch) {
-        record.peerIpMap[Number(useMatch[1])] = useMatch[2];
-        log.info('Peer IP mapped (fallback)', { receiverId: id, peerId: Number(useMatch[1]), ip: useMatch[2] });
-      }
     }
   };
 
@@ -185,11 +157,8 @@ async function restoreState() {
 
 
 function parseFlowsFromLogs(rec) {
-  const peerIpMap = rec.peerIpMap || {};
-
-  // Prefer the eagerly-captured last JSON stats line — it survives log buffer floods
-  // (e.g. "Too many old packets, resetting buffer" spamming the rolling buffer).
-  // Fall back to a backwards scan of the log buffer for receivers restored from state.
+  // Prefer the eagerly-captured last JSON stats line — survives log buffer floods.
+  // Fall back to a backwards scan for receivers restored from state.
   let jsonStr = rec.lastJsonStats ?? null;
   if (!jsonStr) {
     for (let i = rec.logs.length - 1; i >= 0; i--) {
@@ -204,18 +173,13 @@ function parseFlowsFromLogs(rec) {
     const fi = json['receiver-stats']?.flowinstant;
     if (!fi) return [];
     const s = fi.stats || {};
-    const promPeerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
-    const peers = (fi.peers || []).map((p, pIdx) => ({
+    const peers = (fi.peers || []).map(p => ({
       id: p.id,
       dead: p.dead ?? 0,
       rtt: p.stats?.rtt ?? 0,
       avgRtt: p.stats?.avg_rtt ?? 0,
       bitrate: p.stats?.bitrate ?? 0,
       avgBitrate: p.stats?.avg_bitrate ?? 0,
-      // 1. from JSON fields (future ristreceiver versions)
-      // 2. from text log auth message (reliable)
-      // 3. from Prometheus peer_name label (fallback)
-      ip: p.address ?? p.peer_address ?? peerIpMap[p.id] ?? promPeerIps[pIdx] ?? null,
     }));
     const activePeer = peers.find(p => p.dead === 0) || peers[0];
     return [{
