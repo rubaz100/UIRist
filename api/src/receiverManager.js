@@ -69,11 +69,15 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     pid: proc.pid,
     createdAt: existingCreatedAt || new Date().toISOString(),
     logs: [],
+    peerIpMap: {}, // peer_id (number) → ip — persists beyond log buffer rollover
   };
 
   const appendLog = (line) => {
     record.logs.push(line);
     if (record.logs.length > 200) record.logs.shift();
+    // Extract peer IPs eagerly — "Peer 8 will use rist://145.0.0.1:5004"
+    const m = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.a-fA-F]+):\d+/i);
+    if (m) record.peerIpMap[Number(m[1])] = m[2];
   };
 
   proc.stdout.on('data', d => appendLog(d.toString().trimEnd()));
@@ -141,25 +145,10 @@ async function restoreState() {
   }
 }
 
-/**
- * Parse peer ID → IP from ristreceiver text logs.
- * ristreceiver logs lines like:
- *   "Peer 8 will use rist://145.224.73.140:56446 with profile..."
- * The numeric peer ID matches the id field in JSON stats peers[].
- */
-function extractPeerIpMap(logs) {
-  const map = new Map(); // peer_id (number) → ip (string)
-  for (const line of logs) {
-    const m = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.a-fA-F:]+):\d+/i);
-    if (m) map.set(Number(m[1]), m[2]);
-  }
-  return map;
-}
 
 function parseFlowsFromLogs(rec) {
   const lines = rec.logs.flatMap(entry => entry.split('\n'));
-  // Build peer ID → IP map from the full log (not just the last JSON block)
-  const peerIpMap = extractPeerIpMap(lines);
+  const peerIpMap = rec.peerIpMap || {};
 
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
@@ -181,7 +170,7 @@ function parseFlowsFromLogs(rec) {
         // 1. from JSON fields (future ristreceiver versions)
         // 2. from text log "Peer N will use rist://IP:port" (reliable)
         // 3. from Prometheus peer_name label (fallback)
-        ip: p.address ?? p.peer_address ?? peerIpMap.get(p.id) ?? promPeerIps[idx] ?? null,
+        ip: p.address ?? p.peer_address ?? peerIpMap[p.id] ?? promPeerIps[idx] ?? null,
       }));
       const activePeer = peers.find(p => p.dead === 0) || peers[0];
       return [{
