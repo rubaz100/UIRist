@@ -243,7 +243,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
                     style={{ fontSize: '0.7rem' }}
                     onClick={() => setActiveTab('relay')}
                     disabled={!receiver.relay}
-                  >ffmpeg relay</button>
+                  >srt relay</button>
                 </div>
                 <div
                   ref={logBoxRef}
