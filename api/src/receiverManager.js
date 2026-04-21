@@ -53,6 +53,7 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     '-i', inputUrl,
     '-o', outputUrl,
     '-S', '2000',
+    '-v',               // verbose — needed to log peer addresses on connect
     '-M',
     '--metrics-unix', socketPath,
   ];
@@ -81,7 +82,7 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
 
       // Rolling log buffer
       record.logs.push(line);
-      if (record.logs.length > 200) record.logs.shift();
+      if (record.logs.length > 500) record.logs.shift();
 
       // "Peer 8 will use rist://145.0.0.1:5004 with profile..."
       // Appears on first connect — gives us peer_id → IP
