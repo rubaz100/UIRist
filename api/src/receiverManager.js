@@ -72,16 +72,29 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     peerIpMap: {}, // peer_id (number) → ip — persists beyond log buffer rollover
   };
 
-  const appendLog = (line) => {
-    record.logs.push(line);
-    if (record.logs.length > 200) record.logs.shift();
-    // Extract peer IPs eagerly — "Peer 8 will use rist://145.0.0.1:5004"
-    const m = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.a-fA-F]+):\d+/i);
-    if (m) record.peerIpMap[Number(m[1])] = m[2];
+  const processChunk = (chunk) => {
+    // Split chunk into individual lines — data events can contain multiple lines
+    const lines = chunk.toString().split('\n');
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (!line) continue;
+
+      // Rolling log buffer
+      record.logs.push(line);
+      if (record.logs.length > 200) record.logs.shift();
+
+      // "Peer 8 will use rist://145.0.0.1:5004 with profile..."
+      // Appears on first connect — gives us peer_id → IP
+      const useMatch = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.]+):\d+/i);
+      if (useMatch) {
+        record.peerIpMap[Number(useMatch[1])] = useMatch[2];
+        log.info('Peer IP mapped', { receiverId: id, peerId: Number(useMatch[1]), ip: useMatch[2] });
+      }
+    }
   };
 
-  proc.stdout.on('data', d => appendLog(d.toString().trimEnd()));
-  proc.stderr.on('data', d => appendLog(d.toString().trimEnd()));
+  proc.stdout.on('data', processChunk);
+  proc.stderr.on('data', processChunk);
 
   proc.on('spawn', () => {
     record.status = 'running';
@@ -147,7 +160,7 @@ async function restoreState() {
 
 
 function parseFlowsFromLogs(rec) {
-  const lines = rec.logs.flatMap(entry => entry.split('\n'));
+  const lines = rec.logs; // already individual lines since processChunk splits on \n
   const peerIpMap = rec.peerIpMap || {};
 
   for (let i = lines.length - 1; i >= 0; i--) {
