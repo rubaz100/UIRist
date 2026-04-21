@@ -71,6 +71,7 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
     createdAt: existingCreatedAt || new Date().toISOString(),
     logs: [],
     peerIpMap: {}, // peer_id (number) → ip — persists beyond log buffer rollover
+    lastJsonStats: null, // most recent receiver-stats JSON line — survives log buffer flood
   };
 
   let lastSeenPeerId = null; // correlate "New peer #N" with subsequent auth line
@@ -85,6 +86,11 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
       // Rolling log buffer
       record.logs.push(line);
       if (record.logs.length > 500) record.logs.shift();
+
+      // Always keep the most recent JSON stats line outside the rolling buffer
+      // so a flood of "Too many old packets" messages can't push it out
+      const jsonIdx = line.indexOf('{"receiver-stats"');
+      if (jsonIdx !== -1) record.lastJsonStats = line.slice(jsonIdx);
 
       // Pattern 1: "New peer with id #N was configured..."
       // Appears just before the auth message — capture the peer id
@@ -179,48 +185,53 @@ async function restoreState() {
 
 
 function parseFlowsFromLogs(rec) {
-  const lines = rec.logs; // already individual lines since processChunk splits on \n
   const peerIpMap = rec.peerIpMap || {};
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    const idx = line.indexOf('{"receiver-stats"');
-    if (idx === -1) continue;
-    try {
-      const json = JSON.parse(line.slice(idx));
-      const fi = json['receiver-stats']?.flowinstant;
-      if (!fi) continue;
-      const s = fi.stats || {};
-      const promPeerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
-      const peers = (fi.peers || []).map((p, idx) => ({
-        id: p.id,
-        dead: p.dead ?? 0,
-        rtt: p.stats?.rtt ?? 0,
-        avgRtt: p.stats?.avg_rtt ?? 0,
-        bitrate: p.stats?.bitrate ?? 0,
-        avgBitrate: p.stats?.avg_bitrate ?? 0,
-        // 1. from JSON fields (future ristreceiver versions)
-        // 2. from text log "Peer N will use rist://IP:port" (reliable)
-        // 3. from Prometheus peer_name label (fallback)
-        ip: p.address ?? p.peer_address ?? peerIpMap[p.id] ?? promPeerIps[idx] ?? null,
-      }));
-      const activePeer = peers.find(p => p.dead === 0) || peers[0];
-      return [{
-        receiverId: rec.id,
-        receiverName: rec.name,
-        flowId: String(fi.flow_id),
-        peerName: activePeer ? `peer (rtt ${Math.round(activePeer.rtt)}ms)` : 'peer',
-        qualityRatio: (s.quality ?? 100) / 100,
-        packetsReceived: s.received ?? 0,
-        packetsRecovered: s.recovered_total ?? 0,
-        packetsLost: s.lost ?? 0,
-        bitrate: s.bitrate ?? 0,
-        avgBufferTime: s.avg_buffer_time ?? 0,
-        peers,
-      }];
-    } catch { continue; }
+  // Prefer the eagerly-captured last JSON stats line — it survives log buffer floods
+  // (e.g. "Too many old packets, resetting buffer" spamming the rolling buffer).
+  // Fall back to a backwards scan of the log buffer for receivers restored from state.
+  let jsonStr = rec.lastJsonStats ?? null;
+  if (!jsonStr) {
+    for (let i = rec.logs.length - 1; i >= 0; i--) {
+      const idx = rec.logs[i].indexOf('{"receiver-stats"');
+      if (idx !== -1) { jsonStr = rec.logs[i].slice(idx); break; }
+    }
   }
-  return [];
+  if (!jsonStr) return [];
+
+  try {
+    const json = JSON.parse(jsonStr);
+    const fi = json['receiver-stats']?.flowinstant;
+    if (!fi) return [];
+    const s = fi.stats || {};
+    const promPeerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
+    const peers = (fi.peers || []).map((p, pIdx) => ({
+      id: p.id,
+      dead: p.dead ?? 0,
+      rtt: p.stats?.rtt ?? 0,
+      avgRtt: p.stats?.avg_rtt ?? 0,
+      bitrate: p.stats?.bitrate ?? 0,
+      avgBitrate: p.stats?.avg_bitrate ?? 0,
+      // 1. from JSON fields (future ristreceiver versions)
+      // 2. from text log auth message (reliable)
+      // 3. from Prometheus peer_name label (fallback)
+      ip: p.address ?? p.peer_address ?? peerIpMap[p.id] ?? promPeerIps[pIdx] ?? null,
+    }));
+    const activePeer = peers.find(p => p.dead === 0) || peers[0];
+    return [{
+      receiverId: rec.id,
+      receiverName: rec.name,
+      flowId: String(fi.flow_id),
+      peerName: activePeer ? `peer (rtt ${Math.round(activePeer.rtt)}ms)` : 'peer',
+      qualityRatio: (s.quality ?? 100) / 100,
+      packetsReceived: s.received ?? 0,
+      packetsRecovered: s.recovered_total ?? 0,
+      packetsLost: s.lost ?? 0,
+      bitrate: s.bitrate ?? 0,
+      avgBufferTime: s.avg_buffer_time ?? 0,
+      peers,
+    }];
+  } catch { return []; }
 }
 
 function getReceiverFlows(id) {
