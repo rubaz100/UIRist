@@ -141,8 +141,26 @@ async function restoreState() {
   }
 }
 
+/**
+ * Parse peer ID → IP from ristreceiver text logs.
+ * ristreceiver logs lines like:
+ *   "Peer 8 will use rist://145.224.73.140:56446 with profile..."
+ * The numeric peer ID matches the id field in JSON stats peers[].
+ */
+function extractPeerIpMap(logs) {
+  const map = new Map(); // peer_id (number) → ip (string)
+  for (const line of logs) {
+    const m = line.match(/\bPeer\s+(\d+)\s+will\s+use\s+rist:\/\/([\d.a-fA-F:]+):\d+/i);
+    if (m) map.set(Number(m[1]), m[2]);
+  }
+  return map;
+}
+
 function parseFlowsFromLogs(rec) {
   const lines = rec.logs.flatMap(entry => entry.split('\n'));
+  // Build peer ID → IP map from the full log (not just the last JSON block)
+  const peerIpMap = extractPeerIpMap(lines);
+
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     const idx = line.indexOf('{"receiver-stats"');
@@ -152,7 +170,6 @@ function parseFlowsFromLogs(rec) {
       const fi = json['receiver-stats']?.flowinstant;
       if (!fi) continue;
       const s = fi.stats || {};
-      // Get peer IPs from Prometheus metrics (peer_name label = "rist://IP:port")
       const promPeerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
       const peers = (fi.peers || []).map((p, idx) => ({
         id: p.id,
@@ -161,8 +178,10 @@ function parseFlowsFromLogs(rec) {
         avgRtt: p.stats?.avg_rtt ?? 0,
         bitrate: p.stats?.bitrate ?? 0,
         avgBitrate: p.stats?.avg_bitrate ?? 0,
-        // Try to match Prometheus IP by index; fall back to address field if ristreceiver adds it
-        ip: p.address ?? p.peer_address ?? promPeerIps[idx] ?? null,
+        // 1. from JSON fields (future ristreceiver versions)
+        // 2. from text log "Peer N will use rist://IP:port" (reliable)
+        // 3. from Prometheus peer_name label (fallback)
+        ip: p.address ?? p.peer_address ?? peerIpMap.get(p.id) ?? promPeerIps[idx] ?? null,
       }));
       const activePeer = peers.find(p => p.dead === 0) || peers[0];
       return [{
