@@ -93,9 +93,16 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
   }, [receiverLogs, relayLogs]);
 
   const relay = receiver.relay;
-  const srtPullUrl = relay ? `srt://${host}:${relay.srtPort}` : null;
-  const srtPullUrlFull = relay?.passphrase ? `${srtPullUrl}?passphrase=${relay.passphrase}` : srtPullUrl;
-  const srtPullUrlMasked = relay?.passphrase ? `${srtPullUrl}?passphrase=${'•'.repeat(12)}` : srtPullUrl;
+  const srtBase = relay ? `srt://${host}:${relay.srtPort}` : null;
+  // OBS uses microseconds for latency (2 s = 2 000 000 μs); Input Format: mpegts
+  const srtObsUrl = relay?.passphrase
+    ? `${srtBase}?passphrase=${relay.passphrase}&latency=2000000`
+    : srtBase ? `${srtBase}?latency=2000000` : null;
+  const srtObsUrlMasked = relay?.passphrase
+    ? `${srtBase}?passphrase=${'•'.repeat(12)}&latency=2000000`
+    : srtBase ? `${srtBase}?latency=2000000` : null;
+  // VLC ignores URL query params — passphrase must be set in VLC preferences
+  const srtVlcUrl = srtBase;
 
   function generateSrtPassphrase(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -183,34 +190,59 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               </div>
             </div>
 
-            {/* SRT Relay URL — masked passphrase */}
-            {srtPullUrl && (
-              <div className="small mb-1">
-                <div className="d-flex align-items-center gap-1 flex-wrap">
-                  <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
-                    <i className="bi bi-play-circle me-1 text-success opacity-75"></i>SRT Pull
+            {/* SRT Relay — OBS + VLC URLs */}
+            {relay && srtBase && (
+              <div className="mt-1 mb-1 p-2 rounded" style={{ background: 'rgba(25,135,84,0.08)', border: '1px solid rgba(25,135,84,0.2)', fontSize: '0.72rem' }}>
+                {/* Header */}
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <span className="text-success fw-semibold d-flex align-items-center gap-1">
+                    <i className="bi bi-play-circle"></i> SRT Pull
                   </span>
-                  <code className="text-success" style={{ fontSize: '0.72rem' }}>
-                    {srtPassphraseVisible ? srtPullUrlFull : srtPullUrlMasked}
-                  </code>
-                  <OverlayTrigger placement="top" overlay={<Tooltip>{srtPassphraseVisible ? 'Hide passphrase' : 'Show passphrase'}</Tooltip>}>
-                    <Button
-                      variant="link" size="sm" className="p-0 text-muted"
-                      style={{ lineHeight: 1 }}
-                      onClick={() => setSrtPassphraseVisible(v => !v)}
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge
+                      bg={relay.status === 'running' ? 'success' : relay.status === 'error' ? 'danger' : 'warning'}
+                      style={{ fontSize: '0.55rem' }}
                     >
-                      <i className={`bi bi-eye${srtPassphraseVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
-                    </Button>
-                  </OverlayTrigger>
-                  {srtPassphraseVisible && srtPullUrlFull && <CopyButton text={srtPullUrlFull} />}
-                  <Badge
-                    bg={relay!.status === 'running' ? 'success' : relay!.status === 'error' ? 'danger' : 'warning'}
-                    className="ms-1"
-                    style={{ fontSize: '0.55rem' }}
-                  >
-                    {relay!.status}
-                  </Badge>
+                      {relay.status}
+                    </Badge>
+                    <OverlayTrigger placement="top" overlay={<Tooltip>{srtPassphraseVisible ? 'Hide passphrase' : 'Show passphrase'}</Tooltip>}>
+                      <Button variant="link" size="sm" className="p-0 text-muted" style={{ lineHeight: 1 }}
+                        onClick={() => setSrtPassphraseVisible(v => !v)}>
+                        <i className={`bi bi-eye${srtPassphraseVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
+                      </Button>
+                    </OverlayTrigger>
+                  </div>
                 </div>
+
+                {/* OBS row */}
+                <div className="d-flex align-items-center gap-1 mb-1 flex-wrap">
+                  <span className="text-muted" style={{ minWidth: 70 }}>
+                    <i className="bi bi-camera-video me-1"></i>OBS
+                  </span>
+                  <code className="text-success flex-grow-1" style={{ wordBreak: 'break-all' }}>
+                    {srtPassphraseVisible ? srtObsUrl : srtObsUrlMasked}
+                  </code>
+                  {srtPassphraseVisible && srtObsUrl && <CopyButton text={srtObsUrl} />}
+                </div>
+                <div className="text-muted mb-2" style={{ paddingLeft: 74, fontSize: '0.68rem' }}>
+                  Input Format: <code>mpegts</code>
+                </div>
+
+                {/* VLC row */}
+                <div className="d-flex align-items-center gap-1 flex-wrap">
+                  <span className="text-muted" style={{ minWidth: 70 }}>
+                    <i className="bi bi-play-btn me-1"></i>VLC
+                  </span>
+                  <code className="text-success">{srtVlcUrl}</code>
+                  {srtVlcUrl && <CopyButton text={srtVlcUrl} />}
+                </div>
+                {relay.passphrase && (
+                  <div className="text-muted mt-1" style={{ paddingLeft: 74, fontSize: '0.68rem' }}>
+                    <i className="bi bi-info-circle me-1"></i>
+                    VLC: Passphrase unter <em>Einstellungen → Alle → SRT</em> eintragen
+                    {srtPassphraseVisible && <> — <code>{relay.passphrase}</code></>}
+                  </div>
+                )}
               </div>
             )}
 
