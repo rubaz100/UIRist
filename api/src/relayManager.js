@@ -27,10 +27,15 @@ async function startRelay(receiverId, outputUrl, srtPort, passphrase) {
 
   const srtPassphrase = passphrase || generatePassphrase();
 
-  // srt-live-transmit: UDP→SRT relay with AES-128 passphrase encryption
+  // UDP receive buffer: 12 MB — prevents packet loss on high-bitrate bursts from ristreceiver
+  const UDP_RCVBUF = 12 * 1024 * 1024;
+  // SRT latency in milliseconds (2000 ms gives SRT enough room to recover dropped packets)
+  // maxbw=-1 = unlimited bandwidth, sndbuf/rcvbuf = 12 MB each
+  const SRT_BUF = 12 * 1024 * 1024;
+
   const args = [
-    `udp://:${udpPort}`,
-    `srt://:${srtPort}?mode=listener&latency=200000&passphrase=${encodeURIComponent(srtPassphrase)}&pbkeylen=16`,
+    `udp://:${udpPort}?rcvbuf=${UDP_RCVBUF}`,
+    `srt://:${srtPort}?mode=listener&latency=2000&maxbw=-1&rcvbuf=${SRT_BUF}&sndbuf=${SRT_BUF}&passphrase=${encodeURIComponent(srtPassphrase)}&pbkeylen=16`,
   ];
 
   const proc = spawn('srt-live-transmit', args, { stdio: ['ignore', 'pipe', 'pipe'] });
