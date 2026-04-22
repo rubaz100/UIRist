@@ -8,13 +8,15 @@ interface SettingsContextType {
   setDeveloperMode: (enabled: boolean) => void;
   showPortInUrls: boolean;
   setShowPortInUrls: (enabled: boolean) => void;
+  showQrCodes: boolean;
+  setShowQrCodes: (enabled: boolean) => void;
   ristApiUrl: string;
   setRistApiUrl: (url: string) => void;
   ristApiKey: string;
   setRistApiKey: (key: string) => void;
   ristServerHost: string;
   setRistServerHost: (host: string) => void;
-  flowHistoryTimeout: number;         // seconds; 0 = disabled
+  flowHistoryTimeout: number;
   setFlowHistoryTimeout: (s: number) => void;
 }
 
@@ -24,6 +26,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
   const [developerMode, setDeveloperModeState] = useState<boolean>(false);
   const [showPortInUrls, setShowPortInUrlsState] = useState<boolean>(false);
+  const [showQrCodes, setShowQrCodesState] = useState<boolean>(false);
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
   const rawRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
@@ -40,6 +43,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedShowPortInUrls = localStorage.getItem('show-port-in-urls');
     if (savedShowPortInUrls === 'true') setShowPortInUrlsState(true);
+
+    const savedShowQrCodes = localStorage.getItem('show-qr-codes');
+    if (savedShowQrCodes === 'true') setShowQrCodesState(true);
 
     const savedRistApiUrl = localStorage.getItem('rist-api-url');
     if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
@@ -69,6 +75,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     localStorage.setItem('show-port-in-urls', enabled.toString());
   };
 
+  const setShowQrCodes = (enabled: boolean) => {
+    setShowQrCodesState(enabled);
+    localStorage.setItem('show-qr-codes', enabled.toString());
+  };
+
   const setRistApiUrl = (url: string) => {
     setRistApiUrlState(url);
     localStorage.setItem('rist-api-url', url);
@@ -94,6 +105,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       advancedMode, setAdvancedMode,
       developerMode, setDeveloperMode,
       showPortInUrls, setShowPortInUrls,
+      showQrCodes, setShowQrCodes,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
       ristServerHost, setRistServerHost,

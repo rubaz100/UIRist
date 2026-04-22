@@ -18,6 +18,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
     advancedMode, setAdvancedMode,
     developerMode, setDeveloperMode,
     showPortInUrls, setShowPortInUrls,
+    showQrCodes, setShowQrCodes,
     ristApiUrl, setRistApiUrl,
     ristApiKey, setRistApiKey,
     ristServerHost, setRistServerHost,
@@ -211,6 +212,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           {activeTab === 'ui' && (
             <>
               <AdvancedModeToggle checked={advancedMode} onChange={setAdvancedMode} />
+
+              <Form.Group className="mt-3">
+                <Form.Check
+                  type="switch"
+                  id="show-qr-switch"
+                  label={<><i className="bi bi-qr-code me-2 text-info"></i><strong>QR-Codes anzeigen</strong></>}
+                  checked={showQrCodes}
+                  onChange={e => setShowQrCodes(e.target.checked)}
+                />
+                <Form.Text className="text-muted">
+                  Zeigt aufklappbare QR-Codes für RIST- und SRT-URLs auf der Receiver-Card.
+                </Form.Text>
+              </Form.Group>
 
               <Form.Group className="mt-3">
                 <Form.Check

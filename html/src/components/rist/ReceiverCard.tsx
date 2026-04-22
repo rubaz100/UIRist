@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Badge, Button, OverlayTrigger, Tooltip, Form, InputGroup, Collapse } from 'react-bootstrap';
+import { QRCodeSVG } from 'qrcode.react';
 import { RistReceiver } from '../../types/rist-receiver.types';
 import { ristApiService } from '../../services/rist-api.service';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -52,11 +53,13 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
 };
 
 export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onStartRelay, onStopRelay }) => {
-  const { showPortInUrls } = useSettings();
+  const { showPortInUrls, showQrCodes } = useSettings();
   const host = serverHost || 'localhost';
 
   const [secretVisible, setSecretVisible] = useState(false);
   const [srtPassphraseVisible, setSrtPassphraseVisible] = useState(false);
+  const [ristQrOpen, setRistQrOpen] = useState(false);
+  const [srtQrOpen, setSrtQrOpen] = useState(false);
   const [relayLoading, setRelayLoading] = useState(false);
   const [srtPortInput, setSrtPortInput] = useState('5002');
   const [srtPassphraseInput, setSrtPassphraseInput] = useState('');
@@ -157,7 +160,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               <span className="text-muted" style={{ fontSize: '0.65rem' }}>:{receiver.listenPort}</span>
             </div>
 
-            {/* RIST Input URL — password masked by default */}
+            {/* RIST Input URL */}
             <div className="small mb-1">
               <div className="d-flex align-items-center gap-1 flex-wrap">
                 <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
@@ -167,16 +170,28 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
                   {secretVisible ? ristInputUrl : ristInputUrlMasked}
                 </code>
                 <OverlayTrigger placement="top" overlay={<Tooltip>{secretVisible ? 'Hide password' : 'Show password'}</Tooltip>}>
-                  <Button
-                    variant="link" size="sm" className="p-0 text-muted"
-                    style={{ lineHeight: 1 }}
-                    onClick={() => setSecretVisible(v => !v)}
-                  >
+                  <Button variant="link" size="sm" className="p-0 text-muted" style={{ lineHeight: 1 }}
+                    onClick={() => setSecretVisible(v => !v)}>
                     <i className={`bi bi-eye${secretVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
                   </Button>
                 </OverlayTrigger>
-                {secretVisible && <CopyButton text={ristInputUrl} />}
+                <CopyButton text={ristInputUrl} />
+                {showQrCodes && (
+                  <OverlayTrigger placement="top" overlay={<Tooltip>{ristQrOpen ? 'QR schließen' : 'QR anzeigen'}</Tooltip>}>
+                    <Button variant="link" size="sm" className="p-0 text-muted" style={{ lineHeight: 1 }}
+                      onClick={() => setRistQrOpen(v => !v)}>
+                      <i className="bi bi-qr-code" style={{ fontSize: '0.7rem' }}></i>
+                    </Button>
+                  </OverlayTrigger>
+                )}
               </div>
+              {showQrCodes && (
+                <Collapse in={ristQrOpen}>
+                  <div className="mt-2 d-flex justify-content-center p-2 rounded" style={{ background: '#fff', display: 'inline-block' }}>
+                    <QRCodeSVG value={ristInputUrl} size={160} />
+                  </div>
+                </Collapse>
+              )}
             </div>
 
             {/* Output URL */}
@@ -190,58 +205,54 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               </div>
             </div>
 
-            {/* SRT Relay — OBS + VLC URLs */}
+            {/* SRT Relay — OBS URL */}
             {relay && srtBase && (
               <div className="mt-1 mb-1 p-2 rounded" style={{ background: 'rgba(25,135,84,0.08)', border: '1px solid rgba(25,135,84,0.2)', fontSize: '0.72rem' }}>
-                {/* Header */}
                 <div className="d-flex align-items-center justify-content-between mb-1">
                   <span className="text-success fw-semibold d-flex align-items-center gap-1">
                     <i className="bi bi-play-circle"></i> SRT Pull
-                  </span>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge
-                      bg={relay.status === 'running' ? 'success' : relay.status === 'error' ? 'danger' : 'warning'}
-                      style={{ fontSize: '0.55rem' }}
-                    >
+                    <Badge bg={relay.status === 'running' ? 'success' : relay.status === 'error' ? 'danger' : 'warning'}
+                      className="ms-1" style={{ fontSize: '0.55rem' }}>
                       {relay.status}
                     </Badge>
+                  </span>
+                  <div className="d-flex align-items-center gap-1">
                     <OverlayTrigger placement="top" overlay={<Tooltip>{srtPassphraseVisible ? 'Hide passphrase' : 'Show passphrase'}</Tooltip>}>
                       <Button variant="link" size="sm" className="p-0 text-muted" style={{ lineHeight: 1 }}
                         onClick={() => setSrtPassphraseVisible(v => !v)}>
                         <i className={`bi bi-eye${srtPassphraseVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
                       </Button>
                     </OverlayTrigger>
+                    {srtObsUrl && <CopyButton text={srtObsUrl} />}
+                    {showQrCodes && (
+                      <OverlayTrigger placement="top" overlay={<Tooltip>{srtQrOpen ? 'QR schließen' : 'QR anzeigen'}</Tooltip>}>
+                        <Button variant="link" size="sm" className="p-0 text-muted" style={{ lineHeight: 1 }}
+                          onClick={() => setSrtQrOpen(v => !v)}>
+                          <i className="bi bi-qr-code" style={{ fontSize: '0.7rem' }}></i>
+                        </Button>
+                      </OverlayTrigger>
+                    )}
                   </div>
                 </div>
 
-                {/* OBS row */}
-                <div className="d-flex align-items-center gap-1 mb-1 flex-wrap">
-                  <span className="text-muted" style={{ minWidth: 70 }}>
+                <div className="d-flex align-items-center gap-1 flex-wrap">
+                  <span className="text-muted" style={{ minWidth: 40 }}>
                     <i className="bi bi-camera-video me-1"></i>OBS
                   </span>
-                  <code className="text-success flex-grow-1" style={{ wordBreak: 'break-all' }}>
+                  <code className="text-success" style={{ wordBreak: 'break-all' }}>
                     {srtPassphraseVisible ? srtObsUrl : srtObsUrlMasked}
                   </code>
-                  {srtPassphraseVisible && srtObsUrl && <CopyButton text={srtObsUrl} />}
                 </div>
-                <div className="text-muted mb-2" style={{ paddingLeft: 74, fontSize: '0.68rem' }}>
+                <div className="text-muted mt-1" style={{ paddingLeft: 44, fontSize: '0.68rem' }}>
                   Input Format: <code>mpegts</code>
                 </div>
 
-                {/* VLC row */}
-                <div className="d-flex align-items-center gap-1 flex-wrap">
-                  <span className="text-muted" style={{ minWidth: 70 }}>
-                    <i className="bi bi-play-btn me-1"></i>VLC
-                  </span>
-                  <code className="text-success">{srtVlcUrl}</code>
-                  {srtVlcUrl && <CopyButton text={srtVlcUrl} />}
-                </div>
-                {relay.passphrase && (
-                  <div className="text-muted mt-1" style={{ paddingLeft: 74, fontSize: '0.68rem' }}>
-                    <i className="bi bi-info-circle me-1"></i>
-                    VLC: Passphrase unter <em>Einstellungen → Alle → SRT</em> eintragen
-                    {srtPassphraseVisible && <> — <code>{relay.passphrase}</code></>}
-                  </div>
+                {showQrCodes && (
+                  <Collapse in={srtQrOpen}>
+                    <div className="mt-2 d-flex justify-content-center p-2 rounded" style={{ background: '#fff' }}>
+                      {srtObsUrl && <QRCodeSVG value={srtObsUrl} size={160} />}
+                    </div>
+                  </Collapse>
                 )}
               </div>
             )}
