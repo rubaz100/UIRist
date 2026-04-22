@@ -2,6 +2,7 @@ export interface RistRelay {
   receiverId: string;
   udpPort: number;
   srtPort: number;
+  passphrase: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   pid: number | null;
   error?: string;

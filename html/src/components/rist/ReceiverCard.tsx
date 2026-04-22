@@ -9,7 +9,7 @@ interface ReceiverCardProps {
   serverHost?: string;
   developerMode?: boolean;
   onDelete: (id: string) => void;
-  onStartRelay: (id: string, srtPort: number) => Promise<void>;
+  onStartRelay: (id: string, srtPort: number, passphrase?: string) => Promise<void>;
   onStopRelay: (id: string) => Promise<void>;
 }
 
@@ -56,8 +56,10 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
   const host = serverHost || 'localhost';
 
   const [secretVisible, setSecretVisible] = useState(false);
+  const [srtPassphraseVisible, setSrtPassphraseVisible] = useState(false);
   const [relayLoading, setRelayLoading] = useState(false);
   const [srtPortInput, setSrtPortInput] = useState('5002');
+  const [srtPassphraseInput, setSrtPassphraseInput] = useState('');
   const [showRelayInput, setShowRelayInput] = useState(false);
 
   // Dev mode log state
@@ -92,6 +94,15 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
 
   const relay = receiver.relay;
   const srtPullUrl = relay ? `srt://${host}:${relay.srtPort}` : null;
+  const srtPullUrlFull = relay?.passphrase ? `${srtPullUrl}?passphrase=${relay.passphrase}` : srtPullUrl;
+  const srtPullUrlMasked = relay?.passphrase ? `${srtPullUrl}?passphrase=${'•'.repeat(12)}` : srtPullUrl;
+
+  function generateSrtPassphrase(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const array = new Uint8Array(20);
+    crypto.getRandomValues(array);
+    return Array.from(array).map(b => chars[b % chars.length]).join('');
+  }
 
   // RIST input URL — port shown only when setting is enabled
   const ristBase = showPortInUrls ? `rist://${host}:${receiver.listenPort}` : `rist://${host}`;
@@ -103,8 +114,9 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
     if (isNaN(port) || port < 1 || port > 65535) return;
     setRelayLoading(true);
     try {
-      await onStartRelay(receiver.id, port);
+      await onStartRelay(receiver.id, port, srtPassphraseInput.trim() || undefined);
       setShowRelayInput(false);
+      setSrtPassphraseInput('');
     } catch (err: any) {
       alert(err?.response?.data?.error ?? err?.message ?? 'Failed to start relay');
     } finally {
@@ -171,15 +183,26 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               </div>
             </div>
 
-            {/* SRT Relay URL */}
+            {/* SRT Relay URL — masked passphrase */}
             {srtPullUrl && (
               <div className="small mb-1">
-                <div className="d-flex align-items-center gap-1">
+                <div className="d-flex align-items-center gap-1 flex-wrap">
                   <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
                     <i className="bi bi-play-circle me-1 text-success opacity-75"></i>SRT Pull
                   </span>
-                  <code className="text-success" style={{ fontSize: '0.72rem' }}>{srtPullUrl}</code>
-                  <CopyButton text={srtPullUrl} />
+                  <code className="text-success" style={{ fontSize: '0.72rem' }}>
+                    {srtPassphraseVisible ? srtPullUrlFull : srtPullUrlMasked}
+                  </code>
+                  <OverlayTrigger placement="top" overlay={<Tooltip>{srtPassphraseVisible ? 'Hide passphrase' : 'Show passphrase'}</Tooltip>}>
+                    <Button
+                      variant="link" size="sm" className="p-0 text-muted"
+                      style={{ lineHeight: 1 }}
+                      onClick={() => setSrtPassphraseVisible(v => !v)}
+                    >
+                      <i className={`bi bi-eye${srtPassphraseVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
+                    </Button>
+                  </OverlayTrigger>
+                  {srtPassphraseVisible && srtPullUrlFull && <CopyButton text={srtPullUrlFull} />}
                   <Badge
                     bg={relay!.status === 'running' ? 'success' : relay!.status === 'error' ? 'danger' : 'warning'}
                     className="ms-1"
@@ -191,28 +214,47 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               </div>
             )}
 
-            {/* Relay port input */}
+            {/* Relay start form */}
             {showRelayInput && !relay && (
-              <div className="mt-2">
-                <InputGroup size="sm" style={{ maxWidth: 220 }}>
-                  <InputGroup.Text className="text-muted small">SRT Port</InputGroup.Text>
-                  <Form.Control
-                    type="number"
-                    value={srtPortInput}
-                    onChange={e => setSrtPortInput(e.target.value)}
-                    min={1} max={65535}
-                    placeholder="5002"
-                  />
-                  <Button variant="success" size="sm" onClick={handleStartRelay} disabled={relayLoading}>
-                    {relayLoading ? <i className="bi bi-hourglass-split"></i> : 'Start'}
-                  </Button>
+              <div className="mt-2 p-2 rounded" style={{ background: 'rgba(255,255,255,0.04)', fontSize: '0.8rem' }}>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <InputGroup size="sm" style={{ maxWidth: 160 }}>
+                    <InputGroup.Text className="text-muted" style={{ fontSize: '0.75rem' }}>Port</InputGroup.Text>
+                    <Form.Control
+                      type="number"
+                      value={srtPortInput}
+                      onChange={e => setSrtPortInput(e.target.value)}
+                      min={1} max={65535}
+                      placeholder="5002"
+                    />
+                  </InputGroup>
                   <Button variant="outline-secondary" size="sm" onClick={() => setShowRelayInput(false)}>
                     <i className="bi bi-x"></i>
                   </Button>
-                </InputGroup>
-                <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: 2 }}>
-                  VLC/OBS → <code>srt://{host}:{srtPortInput || '5002'}</code>
                 </div>
+                <InputGroup size="sm" className="mb-2">
+                  <InputGroup.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
+                    <i className="bi bi-lock me-1"></i>Passphrase
+                  </InputGroup.Text>
+                  <Form.Control
+                    type="password"
+                    value={srtPassphraseInput}
+                    onChange={e => setSrtPassphraseInput(e.target.value)}
+                    placeholder="auto-generate if empty"
+                    className="font-monospace"
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                  <Button
+                    variant="outline-secondary" size="sm"
+                    onClick={() => setSrtPassphraseInput(generateSrtPassphrase())}
+                    title="Generate passphrase"
+                  >
+                    <i className="bi bi-arrow-clockwise"></i>
+                  </Button>
+                </InputGroup>
+                <Button variant="success" size="sm" onClick={handleStartRelay} disabled={relayLoading}>
+                  {relayLoading ? <><i className="bi bi-hourglass-split me-1"></i>Starting…</> : <><i className="bi bi-play-fill me-1"></i>Start SRT Relay</>}
+                </Button>
               </div>
             )}
           </div>

@@ -9,7 +9,7 @@ interface UseRistReceiversResult {
   error: string | null;
   createReceiver: (payload: CreateReceiverPayload) => Promise<RistReceiver>;
   deleteReceiver: (id: string) => Promise<void>;
-  startRelay: (receiverId: string, srtPort: number) => Promise<void>;
+  startRelay: (receiverId: string, srtPort: number, passphrase?: string) => Promise<void>;
   stopRelay: (receiverId: string) => Promise<void>;
   refresh: () => void;
 }
@@ -54,10 +54,10 @@ export const useRistReceivers = (apiUrl: string, apiKey: string = ''): UseRistRe
     setReceivers(prev => prev.filter(r => r.id !== id));
   };
 
-  const startRelay = async (receiverId: string, srtPort: number): Promise<void> => {
+  const startRelay = async (receiverId: string, srtPort: number, passphrase?: string): Promise<void> => {
     ristApiService.setBaseUrl(apiUrl);
     ristApiService.setApiKey(apiKey);
-    const relay = await ristApiService.startRelay(receiverId, srtPort);
+    const relay = await ristApiService.startRelay(receiverId, srtPort, passphrase);
     setReceivers(prev => prev.map(r => r.id === receiverId ? { ...r, relay } : r));
     // refresh after 1.5s to pick up the updated status (starting → running)
     setTimeout(fetchReceivers, 1500);

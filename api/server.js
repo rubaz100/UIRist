@@ -154,7 +154,7 @@ app.post('/api/receivers/:id/relay', auth, async (req, res) => {
   const rec = getReceiver(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Receiver not found' });
 
-  const { srtPort } = req.body || {};
+  const { srtPort, passphrase } = req.body || {};
   if (!srtPort || typeof srtPort !== 'number' || srtPort < 1 || srtPort > 65535) {
     return res.status(400).json({ error: 'srtPort must be a number between 1 and 65535' });
   }
@@ -164,9 +164,14 @@ app.post('/api/receivers/:id/relay', auth, async (req, res) => {
   if (getUsedPorts().includes(srtPort)) {
     return res.status(400).json({ error: `Port ${srtPort} is already used by a receiver` });
   }
+  if (passphrase !== undefined) {
+    if (typeof passphrase !== 'string' || passphrase.length < 10 || passphrase.length > 79) {
+      return res.status(400).json({ error: 'SRT passphrase must be between 10 and 79 characters' });
+    }
+  }
 
   try {
-    const relay = await startRelay(req.params.id, rec.outputUrl, srtPort);
+    const relay = await startRelay(req.params.id, rec.outputUrl, srtPort, passphrase?.trim());
     res.status(201).json(relay);
   } catch (err) {
     log.error('Failed to start relay', { error: err.message });
