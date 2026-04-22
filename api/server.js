@@ -99,7 +99,7 @@ app.get('/api/receivers/:id', auth, (req, res) => {
 });
 
 app.post('/api/receivers', auth, createLimiter, async (req, res) => {
-  const { name, listenPort, outputUrl } = req.body || {};
+  const { name, listenPort, outputUrl, secret } = req.body || {};
 
   if (!listenPort || typeof listenPort !== 'number' || listenPort < 1 || listenPort > 65535) {
     return res.status(400).json({ error: 'listenPort must be a number between 1 and 65535' });
@@ -112,9 +112,17 @@ app.post('/api/receivers', auth, createLimiter, async (req, res) => {
   if (name !== undefined && (typeof name !== 'string' || name.length > 64)) {
     return res.status(400).json({ error: 'name must be a string of max 64 characters' });
   }
+  if (secret !== undefined) {
+    if (typeof secret !== 'string' || secret.length < 8 || secret.length > 64) {
+      return res.status(400).json({ error: 'secret must be a string between 8 and 64 characters' });
+    }
+    if (/[^a-zA-Z0-9\-_.~!@#$%^&*]/.test(secret)) {
+      return res.status(400).json({ error: 'secret contains invalid characters' });
+    }
+  }
 
   try {
-    const rec = await startReceiver({ name: name?.trim(), listenPort, outputUrl: outputUrl.trim() });
+    const rec = await startReceiver({ name: name?.trim(), listenPort, outputUrl: outputUrl.trim(), secret: secret?.trim() });
     const { _proc, ...pub } = rec;
     res.status(201).json(pub);
   } catch (err) {

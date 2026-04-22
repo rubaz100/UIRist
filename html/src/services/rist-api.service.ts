@@ -6,6 +6,7 @@ export interface CreateReceiverPayload {
   name?: string;
   listenPort: number;
   outputUrl: string;
+  secret?: string;
 }
 
 export interface HealthResponse {

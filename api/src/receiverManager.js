@@ -1,6 +1,7 @@
 'use strict';
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { startSocketServer, stopSocketServer } = require('./metricsServer');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState } = require('./stateManager');
@@ -31,7 +32,12 @@ function findBinary() {
 const BINARY = findBinary();
 const receivers = new Map();
 
-async function startReceiver({ name, listenPort, outputUrl, id: existingId, createdAt: existingCreatedAt } = {}) {
+function generateSecret() {
+  // 16 URL-safe random bytes → 22 base64url chars, no special chars
+  return crypto.randomBytes(16).toString('base64url');
+}
+
+async function startReceiver({ name, listenPort, outputUrl, secret, id: existingId, createdAt: existingCreatedAt } = {}) {
   if (!BINARY) {
     throw new Error('ristreceiver binary not found. Install librist: brew install librist');
   }
@@ -43,9 +49,12 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
   }
 
   const id = existingId || uuidv4();
-  const recName = name || `receiver-${listenPort}`;
+  // Default name: short human-readable ID, not port-based
+  const recName = name || `stream-${id.slice(0, 8)}`;
+  const recSecret = secret || generateSecret();
   const socketPath = `/tmp/rist-metrics-${id}.sock`;
-  const inputUrl = `rist://@0.0.0.0:${listenPort}`;
+  // Append PSK secret to RIST URL — ristreceiver enforces authentication
+  const inputUrl = `rist://@0.0.0.0:${listenPort}?secret=${encodeURIComponent(recSecret)}`;
 
   startSocketServer(socketPath, id, recName);
 
@@ -62,6 +71,7 @@ async function startReceiver({ name, listenPort, outputUrl, id: existingId, crea
   const record = {
     id,
     name: recName,
+    secret: recSecret,
     listenPort,
     outputUrl,
     socketPath,
@@ -147,7 +157,7 @@ async function restoreState() {
   log.info(`Restoring ${saved.length} receiver(s) from state`);
   for (const rec of saved) {
     try {
-      await startReceiver({ name: rec.name, listenPort: rec.listenPort, outputUrl: rec.outputUrl, id: rec.id, createdAt: rec.createdAt });
+      await startReceiver({ name: rec.name, listenPort: rec.listenPort, outputUrl: rec.outputUrl, secret: rec.secret, id: rec.id, createdAt: rec.createdAt });
       log.info('Receiver restored', { name: rec.name, port: rec.listenPort });
     } catch (err) {
       log.error('Failed to restore receiver', { name: rec.name, error: err.message });

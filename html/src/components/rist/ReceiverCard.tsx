@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Badge, Button, OverlayTrigger, Tooltip, Form, InputGroup, Collapse } from 'react-bootstrap';
 import { RistReceiver } from '../../types/rist-receiver.types';
 import { ristApiService } from '../../services/rist-api.service';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface ReceiverCardProps {
   receiver: RistReceiver;
@@ -51,8 +52,10 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
 };
 
 export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onStartRelay, onStopRelay }) => {
+  const { showPortInUrls } = useSettings();
   const host = serverHost || 'localhost';
-  const ristInputUrl = `rist://${host}:${receiver.listenPort}`;
+
+  const [secretVisible, setSecretVisible] = useState(false);
   const [relayLoading, setRelayLoading] = useState(false);
   const [srtPortInput, setSrtPortInput] = useState('5002');
   const [showRelayInput, setShowRelayInput] = useState(false);
@@ -83,13 +86,17 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
     return () => clearInterval(interval);
   }, [logsOpen, developerMode, fetchLogs]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (logBoxRef.current) logBoxRef.current.scrollTop = logBoxRef.current.scrollHeight;
   }, [receiverLogs, relayLogs]);
 
   const relay = receiver.relay;
   const srtPullUrl = relay ? `srt://${host}:${relay.srtPort}` : null;
+
+  // RIST input URL — port shown only when setting is enabled
+  const ristBase = showPortInUrls ? `rist://${host}:${receiver.listenPort}` : `rist://${host}`;
+  const ristInputUrl = receiver.secret ? `${ristBase}?secret=${receiver.secret}` : ristBase;
+  const ristInputUrlMasked = receiver.secret ? `${ristBase}?secret=${'•'.repeat(12)}` : ristBase;
 
   const handleStartRelay = async () => {
     const port = parseInt(srtPortInput, 10);
@@ -119,53 +126,70 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
       <Card.Body className="py-2 px-3">
         <div className="d-flex justify-content-between align-items-start gap-2">
           <div style={{ minWidth: 0, flex: 1 }}>
+
             {/* Header */}
-            <div className="d-flex align-items-center gap-2 mb-1">
+            <div className="d-flex align-items-center gap-2 mb-2">
               <i className="bi bi-hdd-network text-info"></i>
-              <span className="fw-medium text-truncate">{receiver.name}</span>
-              <Badge bg={statusVariant(receiver.status)} className="text-capitalize">
+              <span className="fw-semibold text-truncate">{receiver.name}</span>
+              <Badge bg={statusVariant(receiver.status)} className="text-capitalize" style={{ fontSize: '0.65rem' }}>
                 {receiver.status}
               </Badge>
+              {/* Always show port as subtle hint, independent of URL toggle */}
+              <span className="text-muted" style={{ fontSize: '0.65rem' }}>:{receiver.listenPort}</span>
             </div>
 
-            {/* URLs */}
-            <div className="small">
-              <div className="d-flex align-items-center gap-1 mb-1">
-                <span className="text-muted" style={{ minWidth: 90 }}>
-                  <i className="bi bi-broadcast me-1 text-info opacity-75"></i>
-                  RIST Input
+            {/* RIST Input URL — password masked by default */}
+            <div className="small mb-1">
+              <div className="d-flex align-items-center gap-1 flex-wrap">
+                <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
+                  <i className="bi bi-broadcast me-1 text-info opacity-75"></i>RIST Input
                 </span>
-                <code className="text-info small">{ristInputUrl}</code>
-                <CopyButton text={ristInputUrl} />
+                <code className="text-info" style={{ fontSize: '0.72rem' }}>
+                  {secretVisible ? ristInputUrl : ristInputUrlMasked}
+                </code>
+                <OverlayTrigger placement="top" overlay={<Tooltip>{secretVisible ? 'Hide password' : 'Show password'}</Tooltip>}>
+                  <Button
+                    variant="link" size="sm" className="p-0 text-muted"
+                    style={{ lineHeight: 1 }}
+                    onClick={() => setSecretVisible(v => !v)}
+                  >
+                    <i className={`bi bi-eye${secretVisible ? '-slash' : ''}`} style={{ fontSize: '0.7rem' }}></i>
+                  </Button>
+                </OverlayTrigger>
+                {secretVisible && <CopyButton text={ristInputUrl} />}
               </div>
-              <div className="d-flex align-items-center gap-1 mb-1">
-                <span className="text-muted" style={{ minWidth: 90 }}>
-                  <i className="bi bi-arrow-right me-1 opacity-75"></i>
-                  UDP Output
+            </div>
+
+            {/* Output URL */}
+            <div className="small mb-1">
+              <div className="d-flex align-items-center gap-1">
+                <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
+                  <i className="bi bi-arrow-right me-1 opacity-75"></i>UDP Out
                 </span>
-                <code className="text-secondary small">{receiver.outputUrl}</code>
+                <code className="text-secondary" style={{ fontSize: '0.72rem' }}>{receiver.outputUrl}</code>
                 <CopyButton text={receiver.outputUrl} />
               </div>
+            </div>
 
-              {/* SRT Relay */}
-              {srtPullUrl && (
+            {/* SRT Relay URL */}
+            {srtPullUrl && (
+              <div className="small mb-1">
                 <div className="d-flex align-items-center gap-1">
-                  <span className="text-muted" style={{ minWidth: 90 }}>
-                    <i className="bi bi-play-circle me-1 text-success opacity-75"></i>
-                    SRT Pull
+                  <span className="text-muted" style={{ minWidth: 80, fontSize: '0.75rem' }}>
+                    <i className="bi bi-play-circle me-1 text-success opacity-75"></i>SRT Pull
                   </span>
-                  <code className="text-success small">{srtPullUrl}</code>
+                  <code className="text-success" style={{ fontSize: '0.72rem' }}>{srtPullUrl}</code>
                   <CopyButton text={srtPullUrl} />
                   <Badge
                     bg={relay!.status === 'running' ? 'success' : relay!.status === 'error' ? 'danger' : 'warning'}
                     className="ms-1"
-                    style={{ fontSize: '0.6rem' }}
+                    style={{ fontSize: '0.55rem' }}
                   >
                     {relay!.status}
                   </Badge>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Relay port input */}
             {showRelayInput && !relay && (
@@ -215,6 +239,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
             </Button>
           </div>
         </div>
+
         {/* Developer Mode Log Panel */}
         {developerMode && (
           <div className="mt-2 border-top pt-2">
@@ -230,7 +255,6 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
             </Button>
             <Collapse in={logsOpen}>
               <div>
-                {/* Tab switcher */}
                 <div className="d-flex gap-2 mt-1 mb-1">
                   <button
                     className={`btn btn-link btn-sm p-0 text-decoration-none ${activeTab === 'receiver' ? 'text-info' : 'text-muted'}`}

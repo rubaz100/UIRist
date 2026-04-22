@@ -17,6 +17,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
   const {
     advancedMode, setAdvancedMode,
     developerMode, setDeveloperMode,
+    showPortInUrls, setShowPortInUrls,
     ristApiUrl, setRistApiUrl,
     ristApiKey, setRistApiKey,
     ristServerHost, setRistServerHost,
@@ -166,6 +167,22 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                 placeholder="Enter your RIST API key"
                 helpText="The RIST_API_KEY set in your server's .env file"
               />
+
+              <hr className="my-3" style={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+              <Form.Group className="mb-3">
+                <Form.Check
+                  type="switch"
+                  id="show-port-switch"
+                  label={<><i className="bi bi-123 me-2 text-warning"></i><strong>Port in RIST-URLs anzeigen</strong></>}
+                  checked={showPortInUrls}
+                  onChange={e => setShowPortInUrls(e.target.checked)}
+                />
+                <Form.Text className="text-muted">
+                  <i className="bi bi-shield-exclamation me-1 text-warning"></i>
+                  Zeigt den UDP-Port in der RIST-Eingabe-URL. <strong>Sicherheitshinweis:</strong> Der Port ist ohne PSK-Passwort für jeden offen — stelle sicher, dass jeder Receiver ein Passwort hat.
+                </Form.Text>
+              </Form.Group>
 
               <hr className="my-3" style={{ borderColor: 'rgba(255,255,255,0.1)' }} />
 

@@ -6,6 +6,8 @@ interface SettingsContextType {
   setAdvancedMode: (enabled: boolean) => void;
   developerMode: boolean;
   setDeveloperMode: (enabled: boolean) => void;
+  showPortInUrls: boolean;
+  setShowPortInUrls: (enabled: boolean) => void;
   ristApiUrl: string;
   setRistApiUrl: (url: string) => void;
   ristApiKey: string;
@@ -21,6 +23,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
   const [developerMode, setDeveloperModeState] = useState<boolean>(false);
+  const [showPortInUrls, setShowPortInUrlsState] = useState<boolean>(false);
   const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
   const rawRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
   const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
@@ -34,6 +37,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const savedDeveloperMode = localStorage.getItem('developer-mode');
     if (savedDeveloperMode === 'true') setDeveloperModeState(true);
+
+    const savedShowPortInUrls = localStorage.getItem('show-port-in-urls');
+    if (savedShowPortInUrls === 'true') setShowPortInUrlsState(true);
 
     const savedRistApiUrl = localStorage.getItem('rist-api-url');
     if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
@@ -56,6 +62,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const setDeveloperMode = (enabled: boolean) => {
     setDeveloperModeState(enabled);
     localStorage.setItem('developer-mode', enabled.toString());
+  };
+
+  const setShowPortInUrls = (enabled: boolean) => {
+    setShowPortInUrlsState(enabled);
+    localStorage.setItem('show-port-in-urls', enabled.toString());
   };
 
   const setRistApiUrl = (url: string) => {
@@ -82,6 +93,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     <SettingsContext.Provider value={{
       advancedMode, setAdvancedMode,
       developerMode, setDeveloperMode,
+      showPortInUrls, setShowPortInUrls,
       ristApiUrl, setRistApiUrl,
       ristApiKey, setRistApiKey,
       ristServerHost, setRistServerHost,

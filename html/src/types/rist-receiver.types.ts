@@ -10,10 +10,9 @@ export interface RistRelay {
 export interface RistReceiver {
   id: string;
   name: string;
+  secret: string;
   listenPort: number;
   outputUrl: string;
-  metricsPort: number;
-  metricsUrl: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   pid: number | null;
   createdAt: string;
