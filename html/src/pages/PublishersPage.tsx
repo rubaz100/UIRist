@@ -29,7 +29,7 @@ export const PublishersPage: React.FC = () => {
 
   const { flows: ristFlows, historyFlows: ristHistoryFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
     useRistStats(ristApiConfigured ? ristApiUrl : '', ristApiKey, flowHistoryTimeout);
-  const { receivers, loading: receiversLoading, createReceiver, deleteReceiver, startRelay, stopRelay, refresh: refreshReceivers } =
+  const { receivers, loading: receiversLoading, createReceiver, updateReceiver, deleteReceiver, startRelay, stopRelay, refresh: refreshReceivers } =
     useRistReceivers(ristApiConfigured ? ristApiUrl : '', ristApiKey);
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
   const [receiversExpanded, setReceiversExpanded] = useState(true);
@@ -142,6 +142,7 @@ export const PublishersPage: React.FC = () => {
                         serverHost={resolvedServerHost}
                         developerMode={developerMode}
                         onDelete={deleteReceiver}
+                        onUpdate={updateReceiver}
                         onStartRelay={startRelay}
                         onStopRelay={stopRelay}
                       />

@@ -9,6 +9,12 @@ export interface CreateReceiverPayload {
   secret?: string;
 }
 
+export interface UpdateReceiverPayload {
+  name?: string;
+  secret?: string;
+  outputUrl?: string;
+}
+
 export interface HealthResponse {
   status: string;
   version: string;
@@ -47,6 +53,11 @@ class RistApiService {
 
   async createReceiver(payload: CreateReceiverPayload): Promise<RistReceiver> {
     const res = await axios.post<RistReceiver>(`${this.baseUrl}/api/receivers`, payload, this.opts());
+    return res.data;
+  }
+
+  async updateReceiver(id: string, payload: UpdateReceiverPayload): Promise<RistReceiver> {
+    const res = await axios.put<RistReceiver>(`${this.baseUrl}/api/receivers/${id}`, payload, this.opts());
     return res.data;
   }
 

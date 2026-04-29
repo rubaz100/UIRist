@@ -4,12 +4,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import { RistReceiver } from '../../types/rist-receiver.types';
 import { ristApiService } from '../../services/rist-api.service';
 import { useSettings } from '../../contexts/SettingsContext';
+import { EditReceiverDialog } from './EditReceiverDialog';
 
 interface ReceiverCardProps {
   receiver: RistReceiver;
   serverHost?: string;
   developerMode?: boolean;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, payload: any) => Promise<RistReceiver | void>;
   onStartRelay: (id: string, srtPort: number, passphrase?: string) => Promise<void>;
   onStopRelay: (id: string) => Promise<void>;
 }
@@ -52,10 +54,11 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onStartRelay, onStopRelay }) => {
+export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onUpdate, onStartRelay, onStopRelay }) => {
   const { showPortInUrls, showQrCodes } = useSettings();
   const host = serverHost || 'localhost';
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [secretVisible, setSecretVisible] = useState(false);
   const [srtPassphraseVisible, setSrtPassphraseVisible] = useState(false);
   const [ristQrOpen, setRistQrOpen] = useState(false);
@@ -315,6 +318,14 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
               </Button>
             )}
             <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setEditDialogOpen(true)}
+              title="Edit receiver settings"
+            >
+              <i className="bi bi-pencil"></i>
+            </Button>
+            <Button
               variant="outline-danger"
               size="sm"
               onClick={() => onDelete(receiver.id)}
@@ -383,6 +394,14 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
             </Collapse>
           </div>
         )}
+
+        {/* Edit Dialog */}
+        <EditReceiverDialog
+          open={editDialogOpen}
+          receiver={receiver}
+          onClose={() => setEditDialogOpen(false)}
+          onUpdate={onUpdate}
+        />
       </Card.Body>
     </Card>
   );

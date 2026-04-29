@@ -20,7 +20,7 @@ app.use(express.json());
 const allowedOrigin = process.env.CORS_ORIGIN || '*';
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -127,6 +127,76 @@ app.post('/api/receivers', auth, createLimiter, async (req, res) => {
     res.status(201).json(pub);
   } catch (err) {
     log.error('Failed to start receiver', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update receiver settings (name, secret, outputUrl — not port/listenPort while running)
+app.put('/api/receivers/:id', auth, async (req, res) => {
+  const rec = getReceiver(req.params.id);
+  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
+
+  const { name, secret, outputUrl } = req.body || {};
+  const updates = {};
+
+  // Update name if provided
+  if (name !== undefined) {
+    if (typeof name !== 'string' || name.length > 64) {
+      return res.status(400).json({ error: 'name must be a string of max 64 characters' });
+    }
+    updates.name = name.trim();
+  }
+
+  // Update secret if provided (re-requires restarting receiver)
+  if (secret !== undefined) {
+    if (typeof secret !== 'string' || secret.length < 8 || secret.length > 64) {
+      return res.status(400).json({ error: 'secret must be a string between 8 and 64 characters' });
+    }
+    if (/[^a-zA-Z0-9\-_.~!@#$%^&*]/.test(secret)) {
+      return res.status(400).json({ error: 'secret contains invalid characters' });
+    }
+    updates.secret = secret.trim();
+  }
+
+  // Update outputUrl if provided (re-requires restarting receiver)
+  if (outputUrl !== undefined) {
+    const urlError = validateOutputUrl(outputUrl);
+    if (urlError) return res.status(400).json({ error: urlError });
+    updates.outputUrl = outputUrl.trim();
+  }
+
+  // If no updates, return current receiver
+  if (Object.keys(updates).length === 0) {
+    const { _proc, ...pub } = rec;
+    return res.json(pub);
+  }
+
+  try {
+    // Check if secret or outputUrl changed (these require restart)
+    const needsRestart = updates.secret || updates.outputUrl;
+
+    if (needsRestart) {
+      // Stop current receiver
+      stopReceiver(req.params.id);
+      // Start new one with updated parameters
+      const newRec = await startReceiver({
+        id: rec.id,
+        name: updates.name || rec.name,
+        listenPort: rec.listenPort,
+        secret: updates.secret || rec.secret,
+        outputUrl: updates.outputUrl || rec.outputUrl,
+        createdAt: rec.createdAt,
+      });
+      const { _proc, ...pub } = newRec;
+      res.json(pub);
+    } else {
+      // Just update metadata (name)
+      rec.name = updates.name;
+      const { _proc, ...pub } = rec;
+      res.json(pub);
+    }
+  } catch (err) {
+    log.error('Failed to update receiver', { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
