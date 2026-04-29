@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Badge, Button, OverlayTrigger, Tooltip, Form, InputGroup, Collapse } from 'react-bootstrap';
 import { QRCodeSVG } from 'qrcode.react';
-import { RistReceiver } from '../../types/rist-receiver.types';
+import { RistReceiver } from '../../types';
 import { ristApiService } from '../../services/rist-api.service';
 import { useSettings } from '../../contexts/SettingsContext';
+import { CopyButton } from '../common';
+import { generateSecret } from '../../utils/passphrase';
 import { EditReceiverDialog } from './EditReceiverDialog';
 
 interface ReceiverCardProps {
@@ -16,16 +18,6 @@ interface ReceiverCardProps {
   onStopRelay: (id: string) => Promise<void>;
 }
 
-function fallbackCopy(text: string, done: () => void) {
-  const el = document.createElement('textarea');
-  el.value = text;
-  el.style.cssText = 'position:fixed;opacity:0';
-  document.body.appendChild(el);
-  el.select();
-  try { document.execCommand('copy'); done(); } catch {}
-  document.body.removeChild(el);
-}
-
 function statusVariant(status: RistReceiver['status']): string {
   switch (status) {
     case 'running':  return 'success';
@@ -34,25 +26,6 @@ function statusVariant(status: RistReceiver['status']): string {
     default:         return 'secondary';
   }
 }
-
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
-    } else {
-      fallbackCopy(text, done);
-    }
-  };
-  return (
-    <OverlayTrigger placement="top" overlay={<Tooltip>{copied ? 'Copied!' : 'Copy'}</Tooltip>}>
-      <Button variant="link" size="sm" className="p-0 ms-1 text-muted" onClick={handleCopy} style={{ lineHeight: 1 }}>
-        <i className={`bi bi-${copied ? 'check2' : 'copy'}`} style={{ fontSize: '0.7rem' }}></i>
-      </Button>
-    </OverlayTrigger>
-  );
-};
 
 export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost, developerMode, onDelete, onUpdate, onStartRelay, onStopRelay }) => {
   const { showPortInUrls, showQrCodes } = useSettings();
@@ -109,13 +82,6 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
     : srtBase ? `${srtBase}?latency=2000000` : null;
   // VLC ignores URL query params — passphrase must be set in VLC preferences
   const srtVlcUrl = srtBase;
-
-  function generateSrtPassphrase(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-    const array = new Uint8Array(20);
-    crypto.getRandomValues(array);
-    return Array.from(array).map(b => chars[b % chars.length]).join('');
-  }
 
   // RIST input URL — port shown only when setting is enabled
   const ristBase = showPortInUrls ? `rist://${host}:${receiver.listenPort}` : `rist://${host}`;
@@ -292,7 +258,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({ receiver, serverHost
                   />
                   <Button
                     variant="outline-secondary" size="sm"
-                    onClick={() => setSrtPassphraseInput(generateSrtPassphrase())}
+                    onClick={() => setSrtPassphraseInput(generateSecret(20))}
                     title="Generate passphrase"
                   >
                     <i className="bi bi-arrow-clockwise"></i>
