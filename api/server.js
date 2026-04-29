@@ -1,17 +1,31 @@
 'use strict';
-const express = require('express');
-const rateLimit = require('express-rate-limit');
-const log = require('./src/logger');
-const { isUdpPortAvailable, RESERVED_PORTS, RECEIVER_PORT_MIN, RECEIVER_PORT_MAX } = require('./src/portChecker');
-const { openPort } = require('./src/portManager');
-const {
-  startReceiver, stopReceiver, listReceivers, getReceiver,
-  getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
-} = require('./src/receiverManager');
-const { startRelay, stopRelay, getRelay, getRelayLogs } = require('./src/relayManager');
-const configManager = require('./src/configManager');
+// RISTMonitor API server — entrypoint.
+// Concerns are split into:
+//   src/middleware/  cross-cutting (cors, auth, logging, rate limits)
+//   src/routes/      route handlers, one file per resource
+//   src/validators/  payload validation helpers
+//   src/{receiver,relay,config,port,metrics}Manager.js  domain logic
+//
+// This file only handles wireup, startup, and process lifecycle.
 
-// Load config on startup — env vars override file values
+const express = require('express');
+const log = require('./src/logger');
+const { openPort } = require('./src/portManager');
+const { getBinaryStatus } = require('./src/receiverManager');
+const configManager = require('./src/configManager');
+const { getActiveApiKey } = require('./src/middleware/auth');
+
+const cors = require('./src/middleware/cors');
+const requestLogger = require('./src/middleware/requestLogger');
+
+const healthRoutes = require('./src/routes/health');
+const portRoutes = require('./src/routes/ports');
+const receiverRoutes = require('./src/routes/receivers');
+const relayRoutes = require('./src/routes/relay');
+const statsRoutes = require('./src/routes/stats');
+const configRoutes = require('./src/routes/config');
+
+// Load persisted config first — env vars override file values via configManager.
 const { error: configLoadError } = configManager.loadConfig();
 if (configLoadError) {
   log.error('Config load failed at startup', { error: configLoadError });
@@ -19,339 +33,30 @@ if (configLoadError) {
 
 const app = express();
 const PORT = process.env.RIST_API_PORT || 3001;
-// API_KEY is read dynamically — env var takes precedence over persisted config.
-// This way, updating the key via PUT /api/config takes effect immediately.
-function getActiveApiKey() {
-  return process.env.RIST_API_KEY || configManager.getConfig().ristApiKey || '';
-}
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// ── Cross-cutting middleware ────────────────────────────────────────────
 app.use(express.json());
+app.use(cors);
+app.use(requestLogger);
 
-const allowedOrigin = process.env.CORS_ORIGIN || '*';
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+// ── Routes ──────────────────────────────────────────────────────────────
+app.use(healthRoutes);
+app.use(portRoutes);
+app.use(receiverRoutes);
+app.use(relayRoutes);
+app.use(statsRoutes);
+app.use(configRoutes);
 
-// Request logging
-app.use((req, res, next) => {
-  if (req.path !== '/health') {
-    log.info('Request', { method: req.method, path: req.path });
-  }
-  next();
-});
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-function auth(req, res, next) {
-  const apiKey = getActiveApiKey();
-  if (!apiKey) return next();
-  const provided = req.headers['x-api-key'];
-  if (!provided || provided !== apiKey) {
-    log.warn('Unauthorized request', { path: req.path, ip: req.ip });
-    return res.status(401).json({ error: 'Unauthorized – set X-API-Key header' });
-  }
-  next();
-}
-
-// ── Rate limiting ─────────────────────────────────────────────────────────────
-const createLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 10,
-  message: { error: 'Too many receiver creation requests, please wait.' },
-});
-
-// ── Input validation ──────────────────────────────────────────────────────────
-function validateOutputUrl(url) {
-  if (typeof url !== 'string' || !url.trim()) return 'outputUrl is required';
-  if (!/^(udp|rtp):\/\//i.test(url)) {
-    return 'outputUrl must use udp:// or rtp:// scheme (ristreceiver only supports UDP/RTP output)';
-  }
-  if (/[;&|`$(){}[\]\\<>'"!]/.test(url)) return 'outputUrl contains invalid characters';
-  return null;
-}
-
-// ── Health (no auth) ──────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0', ristreceiver: getBinaryStatus() });
-});
-
-
-// ── Port availability ─────────────────────────────────────────────────────────
-app.get('/api/ports/check', auth, async (req, res) => {
-  const port = parseInt(req.query.port, 10);
-  if (isNaN(port) || port < 1 || port > 65535) {
-    return res.status(400).json({ error: 'Invalid port number' });
-  }
-  const reserved = RESERVED_PORTS.has(port);
-  const usedByReceiver = getUsedPorts().includes(port);
-  const available = !reserved && !usedByReceiver && await isUdpPortAvailable(port);
-  res.json({ port, available, reserved, usedByReceiver });
-});
-
-app.get('/api/ports/used', auth, (req, res) => {
-  res.json({
-    receiverPorts: getUsedPorts(),
-    reservedPorts: Array.from(RESERVED_PORTS),
-  });
-});
-
-// ── Receivers ─────────────────────────────────────────────────────────────────
-app.get('/api/receivers', auth, (req, res) => {
-  res.json(listReceivers());
-});
-
-app.get('/api/receivers/:id', auth, (req, res) => {
-  const rec = getReceiver(req.params.id);
-  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
-  res.json(rec);
-});
-
-app.post('/api/receivers', auth, createLimiter, async (req, res) => {
-  const { name, listenPort, outputUrl, secret } = req.body || {};
-
-  if (!listenPort || typeof listenPort !== 'number' || listenPort < 1 || listenPort > 65535) {
-    return res.status(400).json({ error: 'listenPort must be a number between 1 and 65535' });
-  }
-  if (RESERVED_PORTS.has(listenPort)) {
-    return res.status(400).json({ error: `Port ${listenPort} is reserved and cannot be used` });
-  }
-  const urlError = validateOutputUrl(outputUrl);
-  if (urlError) return res.status(400).json({ error: urlError });
-  if (name !== undefined && (typeof name !== 'string' || name.length > 64)) {
-    return res.status(400).json({ error: 'name must be a string of max 64 characters' });
-  }
-  if (secret !== undefined) {
-    if (typeof secret !== 'string' || secret.length < 8 || secret.length > 64) {
-      return res.status(400).json({ error: 'secret must be a string between 8 and 64 characters' });
-    }
-    if (/[^a-zA-Z0-9\-_.~!@#$%^&*]/.test(secret)) {
-      return res.status(400).json({ error: 'secret contains invalid characters' });
-    }
-  }
-
-  try {
-    const rec = await startReceiver({ name: name?.trim(), listenPort, outputUrl: outputUrl.trim(), secret: secret?.trim() });
-    const { _proc, ...pub } = rec;
-    res.status(201).json(pub);
-  } catch (err) {
-    log.error('Failed to start receiver', { error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Update receiver settings (name, secret, outputUrl — not port/listenPort while running)
-app.put('/api/receivers/:id', auth, async (req, res) => {
-  const rec = getReceiver(req.params.id);
-  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
-
-  const { name, secret, outputUrl } = req.body || {};
-  const updates = {};
-
-  // Update name if provided
-  if (name !== undefined) {
-    if (typeof name !== 'string' || name.length > 64) {
-      return res.status(400).json({ error: 'name must be a string of max 64 characters' });
-    }
-    updates.name = name.trim();
-  }
-
-  // Update secret if provided (re-requires restarting receiver)
-  if (secret !== undefined) {
-    if (typeof secret !== 'string' || secret.length < 8 || secret.length > 64) {
-      return res.status(400).json({ error: 'secret must be a string between 8 and 64 characters' });
-    }
-    if (/[^a-zA-Z0-9\-_.~!@#$%^&*]/.test(secret)) {
-      return res.status(400).json({ error: 'secret contains invalid characters' });
-    }
-    updates.secret = secret.trim();
-  }
-
-  // Update outputUrl if provided (re-requires restarting receiver)
-  if (outputUrl !== undefined) {
-    const urlError = validateOutputUrl(outputUrl);
-    if (urlError) return res.status(400).json({ error: urlError });
-    updates.outputUrl = outputUrl.trim();
-  }
-
-  // If no updates, return current receiver
-  if (Object.keys(updates).length === 0) {
-    const { _proc, ...pub } = rec;
-    return res.json(pub);
-  }
-
-  try {
-    // Check if secret or outputUrl changed (these require restart)
-    const needsRestart = updates.secret || updates.outputUrl;
-
-    if (needsRestart) {
-      // Stop current receiver
-      stopReceiver(req.params.id);
-      // Start new one with updated parameters
-      const newRec = await startReceiver({
-        id: rec.id,
-        name: updates.name || rec.name,
-        listenPort: rec.listenPort,
-        secret: updates.secret || rec.secret,
-        outputUrl: updates.outputUrl || rec.outputUrl,
-        createdAt: rec.createdAt,
-      });
-      const { _proc, ...pub } = newRec;
-      res.json(pub);
-    } else {
-      // Just update metadata (name)
-      rec.name = updates.name;
-      const { _proc, ...pub } = rec;
-      res.json(pub);
-    }
-  } catch (err) {
-    log.error('Failed to update receiver', { error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/receivers/:id', auth, (req, res) => {
-  const ok = stopReceiver(req.params.id);
-  if (!ok) return res.status(404).json({ error: 'Receiver not found' });
-  res.json({ success: true });
-});
-
-// ── Relay (ffmpeg UDP → SRT listener) ────────────────────────────────────────
-app.get('/api/receivers/:id/relay', auth, (req, res) => {
-  const relay = getRelay(req.params.id);
-  if (!relay) return res.status(404).json({ error: 'No relay running for this receiver' });
-  res.json(relay);
-});
-
-app.get('/api/receivers/:id/relay/logs', auth, (req, res) => {
-  const logs = getRelayLogs(req.params.id);
-  if (logs === null) return res.status(404).json({ error: 'No relay running for this receiver' });
-  res.json({ logs });
-});
-
-app.post('/api/receivers/:id/relay', auth, async (req, res) => {
-  const rec = getReceiver(req.params.id);
-  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
-
-  const { srtPort, passphrase } = req.body || {};
-  if (!srtPort || typeof srtPort !== 'number' || srtPort < 1 || srtPort > 65535) {
-    return res.status(400).json({ error: 'srtPort must be a number between 1 and 65535' });
-  }
-  if (RESERVED_PORTS.has(srtPort)) {
-    return res.status(400).json({ error: `Port ${srtPort} is reserved` });
-  }
-  if (getUsedPorts().includes(srtPort)) {
-    return res.status(400).json({ error: `Port ${srtPort} is already used by a receiver` });
-  }
-  if (passphrase !== undefined) {
-    if (typeof passphrase !== 'string' || passphrase.length < 10 || passphrase.length > 79) {
-      return res.status(400).json({ error: 'SRT passphrase must be between 10 and 79 characters' });
-    }
-  }
-
-  try {
-    const relay = await startRelay(req.params.id, rec.outputUrl, srtPort, passphrase?.trim());
-    res.status(201).json(relay);
-  } catch (err) {
-    log.error('Failed to start relay', { error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/receivers/:id/relay', auth, (req, res) => {
-  const ok = stopRelay(req.params.id);
-  if (!ok) return res.status(404).json({ error: 'No relay found for this receiver' });
-  res.json({ success: true });
-});
-
-app.get('/api/receivers/:id/logs', auth, (req, res) => {
-  const rec = receivers.get(req.params.id);
-  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
-  res.json({ logs: rec.logs });
-});
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
-app.get('/api/stats', auth, (req, res) => {
-  res.json({ flows: getAllFlows() });
-});
-
-app.get('/api/receivers/:id/stats', auth, (req, res) => {
-  const rec = receivers.get(req.params.id);
-  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
-  res.json({ flows: getReceiverFlows(req.params.id) });
-});
-
-// ── Config (persisted settings) ───────────────────────────────────────────────
-app.get('/api/config', auth, (req, res) => {
-  const status = configManager.getStatus();
-  res.json({
-    config: configManager.getConfig(),
-    error: status.error,
-    configFile: status.configFile,
-  });
-});
-
-app.put('/api/config', auth, (req, res) => {
-  const updates = req.body;
-  if (!updates || typeof updates !== 'object') {
-    return res.status(400).json({ error: 'Body must be an object of config updates' });
-  }
-  try {
-    const { config } = configManager.saveConfig(updates);
-    res.json({ config, error: null });
-  } catch (err) {
-    log.error('Config save endpoint error', { error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Export encrypted config (download)
-app.post('/api/config/export', auth, (req, res) => {
-  const { password } = req.body || {};
-  if (!password || typeof password !== 'string' || password.length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
-  }
-  try {
-    const envelope = configManager.encryptConfig(password);
-    res.json(envelope);
-  } catch (err) {
-    log.error('Config export error', { error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Import encrypted config (upload)
-app.post('/api/config/import', auth, (req, res) => {
-  const { password, envelope } = req.body || {};
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Password is required' });
-  }
-  if (!envelope || typeof envelope !== 'object') {
-    return res.status(400).json({ error: 'envelope is required' });
-  }
-  try {
-    const decrypted = configManager.decryptConfig(envelope, password);
-    const { config } = configManager.saveConfig(decrypted);
-    res.json({ config, error: null });
-  } catch (err) {
-    log.warn('Config import failed', { error: err.message });
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ── Start ───────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   const bin = getBinaryStatus();
-  log.info('UIRist API Server started', {
+  log.info('RISTMonitor API Server started', {
     port: PORT,
     ristreceiver: bin.available ? bin.path : 'NOT FOUND',
     auth: getActiveApiKey() ? 'enabled' : 'disabled',
     configFile: configManager.CONFIG_FILE,
     configError: configLoadError || 'none',
-    cors: allowedOrigin,
+    cors: process.env.CORS_ORIGIN || '*',
   });
   openPort(PORT, 'tcp'); // open API port in iptables automatically
 });
