@@ -21,6 +21,35 @@ export interface HealthResponse {
   ristreceiver: { available: boolean; path: string | null };
 }
 
+export interface PersistedConfig {
+  srtApiKey: string;
+  ristApiKey: string;
+  ristApiUrl: string;
+  ristServerHost: string;
+  flowHistoryTimeout: number;
+  advancedMode: boolean;
+  developerMode: boolean;
+  showPortInUrls: boolean;
+  showQrCodes: boolean;
+}
+
+export interface ConfigResponse {
+  config: PersistedConfig;
+  error: string | null;
+  configFile: string;
+}
+
+export interface EncryptedEnvelope {
+  version: number;
+  algorithm: string;
+  iterations: number;
+  salt: string;
+  iv: string;
+  tag: string;
+  ciphertext: string;
+  exportedAt: string;
+}
+
 class RistApiService {
   private baseUrl: string = '';
   private apiKey: string = '';
@@ -102,6 +131,31 @@ class RistApiService {
 
   async stopRelay(receiverId: string): Promise<void> {
     await axios.delete(`${this.baseUrl}/api/receivers/${receiverId}/relay`, this.opts());
+  }
+
+  // ── Config persistence ─────────────────────────────────────────────────
+  async getPersistedConfig(): Promise<ConfigResponse> {
+    const res = await axios.get<ConfigResponse>(`${this.baseUrl}/api/config`, this.opts());
+    return res.data;
+  }
+
+  async savePersistedConfig(updates: Partial<PersistedConfig>): Promise<ConfigResponse> {
+    const res = await axios.put<ConfigResponse>(`${this.baseUrl}/api/config`, updates, this.opts());
+    return res.data;
+  }
+
+  async exportConfig(password: string): Promise<EncryptedEnvelope> {
+    const res = await axios.post<EncryptedEnvelope>(`${this.baseUrl}/api/config/export`, { password }, this.opts());
+    return res.data;
+  }
+
+  async importConfig(envelope: EncryptedEnvelope, password: string): Promise<ConfigResponse> {
+    const res = await axios.post<ConfigResponse>(
+      `${this.baseUrl}/api/config/import`,
+      { envelope, password },
+      this.opts()
+    );
+    return res.data;
   }
 }
 

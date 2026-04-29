@@ -24,12 +24,15 @@ services:
     environment:
       RIST_API_PORT: "3001"
       RIST_API_KEY: "${RIST_API_KEY:-}"
+      SRT_API_KEY: "${SRT_API_KEY:-}"
       CORS_ORIGIN: "${CORS_ORIGIN:-*}"
       RIST_STATE_FILE: "/app/data/receivers.json"
+      CONFIG_DIR: "/data"
       NODE_ENV: "production"
     volumes:
-      - rist-data:/app/data
+      - rist-data:/app/data         # ristreceiver state (named volume)
       - rist-logs:/app/logs
+      - ./data:/data                # persistent UI config (bind mount, survives compose down/up)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]

@@ -13,7 +13,8 @@ import { RefreshTimer } from '../components/ui';
 
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, developerMode } = useSettings();
+  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, developerMode, configError } = useSettings();
+  const [configErrorDismissed, setConfigErrorDismissed] = useState(false);
 
   const resolvedServerHost = ristServerHost || (() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })();
 
@@ -86,6 +87,15 @@ export const PublishersPage: React.FC = () => {
       <Container className="py-4">
         {error && (
           <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-3">{error}</Alert>
+        )}
+        {configError && !configErrorDismissed && (
+          <Alert variant="warning" dismissible onClose={() => setConfigErrorDismissed(true)} className="mb-3">
+            <i className="bi bi-shield-exclamation me-2"></i>
+            <strong>Konfiguration konnte nicht geladen werden:</strong> {configError}
+            <div className="small mt-1 text-muted">
+              Settings sind lokal verfügbar, aber wurden nicht vom Server geladen. Beim Neustart können Daten verloren gehen.
+            </div>
+          </Alert>
         )}
 
         <Row className="mb-3 align-items-center">

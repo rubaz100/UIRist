@@ -9,10 +9,21 @@ const {
   getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
 } = require('./src/receiverManager');
 const { startRelay, stopRelay, getRelay, getRelayLogs } = require('./src/relayManager');
+const configManager = require('./src/configManager');
+
+// Load config on startup — env vars override file values
+const { error: configLoadError } = configManager.loadConfig();
+if (configLoadError) {
+  log.error('Config load failed at startup', { error: configLoadError });
+}
 
 const app = express();
 const PORT = process.env.RIST_API_PORT || 3001;
-const API_KEY = process.env.RIST_API_KEY || '';
+// API_KEY is read dynamically — env var takes precedence over persisted config.
+// This way, updating the key via PUT /api/config takes effect immediately.
+function getActiveApiKey() {
+  return process.env.RIST_API_KEY || configManager.getConfig().ristApiKey || '';
+}
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json());
@@ -36,9 +47,10 @@ app.use((req, res, next) => {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function auth(req, res, next) {
-  if (!API_KEY) return next();
+  const apiKey = getActiveApiKey();
+  if (!apiKey) return next();
   const provided = req.headers['x-api-key'];
-  if (!provided || provided !== API_KEY) {
+  if (!provided || provided !== apiKey) {
     log.warn('Unauthorized request', { path: req.path, ip: req.ip });
     return res.status(401).json({ error: 'Unauthorized – set X-API-Key header' });
   }
@@ -272,13 +284,73 @@ app.get('/api/receivers/:id/stats', auth, (req, res) => {
   res.json({ flows: getReceiverFlows(req.params.id) });
 });
 
+// ── Config (persisted settings) ───────────────────────────────────────────────
+app.get('/api/config', auth, (req, res) => {
+  const status = configManager.getStatus();
+  res.json({
+    config: configManager.getConfig(),
+    error: status.error,
+    configFile: status.configFile,
+  });
+});
+
+app.put('/api/config', auth, (req, res) => {
+  const updates = req.body;
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ error: 'Body must be an object of config updates' });
+  }
+  try {
+    const { config } = configManager.saveConfig(updates);
+    res.json({ config, error: null });
+  } catch (err) {
+    log.error('Config save endpoint error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Export encrypted config (download)
+app.post('/api/config/export', auth, (req, res) => {
+  const { password } = req.body || {};
+  if (!password || typeof password !== 'string' || password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+  try {
+    const envelope = configManager.encryptConfig(password);
+    res.json(envelope);
+  } catch (err) {
+    log.error('Config export error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Import encrypted config (upload)
+app.post('/api/config/import', auth, (req, res) => {
+  const { password, envelope } = req.body || {};
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+  if (!envelope || typeof envelope !== 'object') {
+    return res.status(400).json({ error: 'envelope is required' });
+  }
+  try {
+    const decrypted = configManager.decryptConfig(envelope, password);
+    const { config } = configManager.saveConfig(decrypted);
+    res.json({ config, error: null });
+  } catch (err) {
+    log.warn('Config import failed', { error: err.message });
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   const bin = getBinaryStatus();
   log.info('UIRist API Server started', {
     port: PORT,
     ristreceiver: bin.available ? bin.path : 'NOT FOUND',
-    auth: API_KEY ? 'enabled' : 'disabled',
+    auth: getActiveApiKey() ? 'enabled' : 'disabled',
+    configFile: configManager.CONFIG_FILE,
+    configError: configLoadError || 'none',
     cors: allowedOrigin,
   });
   openPort(PORT, 'tcp'); // open API port in iptables automatically
