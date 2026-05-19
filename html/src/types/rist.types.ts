@@ -5,6 +5,14 @@ export interface RistPeer {
   avgRtt: number;        // ms
   bitrate: number;       // bps
   avgBitrate: number;    // bps
+  // Populated by the backend when libRIST emits a peer_name label on its
+  // metrics socket. Null until the first metrics push arrives.
+  ip?: string | null;
+  // Populated asynchronously after the backend's ISP lookup resolves. Null
+  // while the lookup is pending or if the upstream provider failed.
+  isp?: string | null;
+  // ISO-3166 alpha-2 country code (e.g. "DE"). UI renders a flag emoji from it.
+  country?: string | null;
 }
 
 export interface RistFlow {

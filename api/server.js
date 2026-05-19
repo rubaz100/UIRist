@@ -13,6 +13,7 @@ const log = require('./src/logger');
 const { openPort } = require('./src/portManager');
 const { getBinaryStatus } = require('./src/receiverManager');
 const configManager = require('./src/configManager');
+const ispLookup = require('./src/ispLookup');
 const { getActiveApiKey } = require('./src/middleware/auth');
 
 const cors = require('./src/middleware/cors');
@@ -29,6 +30,14 @@ const configRoutes = require('./src/routes/config');
 const { error: configLoadError } = configManager.loadConfig();
 if (configLoadError) {
   log.error('Config load failed at startup', { error: configLoadError });
+}
+
+// Best-effort: warm up the ISP cache from disk so the first /api/stats call
+// after a restart already serves cached ISP/country info.
+try {
+  ispLookup.loadCache();
+} catch (err) {
+  log.warn('ispLookup load failed at startup (continuing)', { error: err.message });
 }
 
 const app = express();

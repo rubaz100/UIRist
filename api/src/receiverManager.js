@@ -2,7 +2,8 @@
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const { startSocketServer, stopSocketServer } = require('./metricsServer');
+const { startSocketServer, stopSocketServer, getPeerIpMap } = require('./metricsServer');
+const ispLookup = require('./ispLookup');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState } = require('./stateManager');
 const { getRelay, stopRelay: stopReceiverRelay } = require('./relayManager');
@@ -183,14 +184,25 @@ function parseFlowsFromLogs(rec) {
     const fi = json['receiver-stats']?.flowinstant;
     if (!fi) return [];
     const s = fi.stats || {};
-    const peers = (fi.peers || []).map(p => ({
-      id: p.id,
-      dead: p.dead ?? 0,
-      rtt: p.stats?.rtt ?? 0,
-      avgRtt: p.stats?.avg_rtt ?? 0,
-      bitrate: p.stats?.bitrate ?? 0,
-      avgBitrate: p.stats?.avg_bitrate ?? 0,
-    }));
+    // IPs are observed on the Prometheus metrics socket (separate stream).
+    // For each peer.id we look up the IP that librist labelled on its metrics.
+    // Missing entries (early polls, mismatched id types) just yield null.
+    const peerIpMap = getPeerIpMap(rec.socketPath, String(fi.flow_id));
+    const peers = (fi.peers || []).map(p => {
+      const ip = peerIpMap.get(String(p.id)) || null;
+      const ispInfo = ip ? ispLookup.lookupSync(ip) : null;
+      return {
+        id: p.id,
+        dead: p.dead ?? 0,
+        rtt: p.stats?.rtt ?? 0,
+        avgRtt: p.stats?.avg_rtt ?? 0,
+        bitrate: p.stats?.bitrate ?? 0,
+        avgBitrate: p.stats?.avg_bitrate ?? 0,
+        ip,
+        isp: ispInfo?.isp ?? null,
+        country: ispInfo?.country ?? null,
+      };
+    });
     const activePeer = peers.find(p => p.dead === 0) || peers[0];
     return [{
       receiverId: rec.id,

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Badge } from 'react-bootstrap';
+import { Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { RistPeer } from '../../types';
 import { Sparkline } from '../charts';
+import { countryCodeToFlag } from '../../utils/countryFlag';
 
 interface PeerGraphCardProps {
   peer: RistPeer;
@@ -62,6 +63,31 @@ export const PeerGraphCard: React.FC<PeerGraphCardProps> = ({ peer, peerIndex, s
           <div className="text-muted" style={{ fontSize: '0.65rem' }}>
             avg {formatBitrate(peer.avgBitrate)}
           </div>
+        )}
+        {peer.ip && (
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>{[peer.isp, peer.ip].filter(Boolean).join(' · ')}</Tooltip>}
+          >
+            <div
+              className="text-muted text-truncate d-flex align-items-center gap-1"
+              style={{ fontSize: '0.65rem', maxWidth: CARD_SIZE - 16 }}
+            >
+              {(() => {
+                const flag = countryCodeToFlag(peer.country);
+                return flag ? <span aria-hidden="true">{flag}</span> : null;
+              })()}
+              {peer.isp ? (
+                <>
+                  <span className="text-truncate">{peer.isp}</span>
+                  <span className="opacity-50">·</span>
+                  <span className="font-monospace text-truncate">{peer.ip}</span>
+                </>
+              ) : (
+                <span className="font-monospace text-truncate">{peer.ip}</span>
+              )}
+            </div>
+          </OverlayTrigger>
         )}
       </div>
 
