@@ -14,7 +14,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
+const http = require('http');
 const log = require('./logger');
 
 const CONFIG_DIR = process.env.CONFIG_DIR || '/data';
@@ -104,8 +104,8 @@ function isExpired(entry) {
 function fetchFromProvider(ip) {
   if (inflight.has(ip)) return inflight.get(ip);
   const promise = new Promise((resolve) => {
-    const url = `https://ip-api.com/json/${encodeURIComponent(ip)}?fields=isp,country,countryCode,status,message`;
-    const req = https.get(url, { timeout: REQUEST_TIMEOUT_MS }, (res) => {
+    const url = `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=isp,country,countryCode,status,message`;
+    const req = http.get(url, { timeout: REQUEST_TIMEOUT_MS }, (res) => {
       let body = '';
       res.on('data', (d) => { body += d; });
       res.on('end', () => {

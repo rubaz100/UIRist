@@ -2,7 +2,7 @@
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const { startSocketServer, stopSocketServer, getPeerIpMap } = require('./metricsServer');
+const { startSocketServer, stopSocketServer, getPeerIps, getPeerIpMap } = require('./metricsServer');
 const ispLookup = require('./ispLookup');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState, normalizeRelayConfig } = require('./stateManager');
@@ -241,8 +241,9 @@ function parseFlowsFromLogs(rec) {
     // For each peer.id we look up the IP that librist labelled on its metrics.
     // Missing entries (early polls, mismatched id types) just yield null.
     const peerIpMap = getPeerIpMap(rec.socketPath, String(fi.flow_id));
-    const peers = (fi.peers || []).map(p => {
-      const ip = peerIpMap.get(String(p.id)) || null;
+    const peerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
+    const peers = (fi.peers || []).map((p, index) => {
+      const ip = peerIpMap.get(String(p.id)) || peerIps[index] || null;
       const ispInfo = ip ? ispLookup.lookupSync(ip) : null;
       return {
         id: p.id,

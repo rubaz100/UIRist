@@ -1,56 +1,93 @@
 'use strict';
 /**
  * Unix-socket metrics collector.
- * ristreceiver connects to a Unix socket and pushes Prometheus text.
- * We listen on the socket and keep the latest payload per receiver.
+ * ristreceiver exposes Prometheus text over an HTTP server bound to a Unix
+ * socket. We poll that socket and keep the latest payload per receiver.
  *
  * In addition to the flow-level summary, we build a `peer_id → IP` map per flow
  * so consumers can correlate the JSON-stats peers (which have `id` but no IP)
  * with their real socket address.
  */
-const net = require('net');
+const http = require('http');
 const fs = require('fs');
 const { parsePrometheus } = require('./metricsFetcher');
+const log = require('./logger');
 
-// Map: socketPath → { server, state }
+const METRICS_POLL_MS = parseInt(process.env.RIST_METRICS_POLL_MS || '2000', 10);
+const METRICS_TIMEOUT_MS = 1500;
+
+// Map: socketPath → { timer, startupTimer, state }
 //   state = { latestText, latestFlows, peerIpsByFlow: Map<flowId, Map<peerId, ip>> }
 const socketServers = new Map();
 
 function startSocketServer(socketPath, receiverId, receiverName) {
-  // Remove stale socket file
+  // Remove stale socket file before ristreceiver creates its metrics endpoint.
   try { fs.unlinkSync(socketPath); } catch {}
 
-  const state = { latestText: '', latestFlows: [], peerIpsByFlow: new Map() };
+  const state = {
+    latestText: '',
+    latestFlows: [],
+    peerIpsByFlow: new Map(),
+    lastError: null,
+  };
 
-  const server = net.createServer((conn) => {
-    let buf = '';
-    conn.on('data', (d) => { buf += d.toString(); });
-    conn.on('end', () => {
-      if (buf.trim()) {
-        state.latestText = buf;
-        const { flows, peerIpsByFlow } = samplesToFlows(
-          parsePrometheus(buf), receiverId, receiverName,
-        );
-        state.latestFlows = flows;
-        state.peerIpsByFlow = peerIpsByFlow;
+  const poll = async () => {
+    try {
+      const text = await fetchMetrics(socketPath);
+      if (!text.trim()) return;
+
+      state.latestText = text;
+      const { flows, peerIpsByFlow } = samplesToFlows(
+        parsePrometheus(text), receiverId, receiverName,
+      );
+      state.latestFlows = flows;
+      state.peerIpsByFlow = peerIpsByFlow;
+      state.lastError = null;
+    } catch (err) {
+      const code = err?.code || err?.message;
+      // The socket is absent briefly while ristreceiver starts, and can vanish
+      // while it exits. Those are normal lifecycle states.
+      if (code === 'ENOENT' || code === 'ECONNREFUSED') return;
+      if (state.lastError !== code) {
+        state.lastError = code;
+        log.warn('metricsServer: failed to poll ristreceiver metrics', {
+          socketPath,
+          error: err.message,
+        });
       }
-    });
-    conn.on('error', () => {});
-  });
+    }
+  };
 
-  server.listen(socketPath, () => {});
-  server.on('error', () => {});
+  const timer = setInterval(poll, Number.isFinite(METRICS_POLL_MS) ? METRICS_POLL_MS : 2000);
+  timer.unref?.();
+  const startupTimer = setTimeout(poll, 250);
+  startupTimer.unref?.();
 
-  socketServers.set(socketPath, { server, state });
+  socketServers.set(socketPath, { timer, startupTimer, state });
   return state;
 }
 
 function stopSocketServer(socketPath) {
   const entry = socketServers.get(socketPath);
   if (!entry) return;
-  entry.server.close();
+  clearInterval(entry.timer);
+  clearTimeout(entry.startupTimer);
   try { fs.unlinkSync(socketPath); } catch {}
   socketServers.delete(socketPath);
+}
+
+function fetchMetrics(socketPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ socketPath, path: '/metrics', method: 'GET' }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve(data));
+    });
+    req.setTimeout(METRICS_TIMEOUT_MS, () => {
+      req.destroy(new Error('timeout'));
+    });
+    req.on('error', reject);
+  });
 }
 
 function getLatestFlows(socketPath) {
@@ -71,6 +108,9 @@ function parsePeerIp(peerName) {
   if (!peerName) return null;
   let s = peerName.replace(/^rist:\/\//i, '').trim();
   if (!s) return null;
+  const queryIdx = s.search(/[/?#]/);
+  if (queryIdx !== -1) s = s.slice(0, queryIdx);
+  if (s.includes('@')) s = s.slice(s.lastIndexOf('@') + 1);
 
   // Bracketed IPv6: "[2001:db8::1]:5004" or "[2001:db8::1]"
   if (s.startsWith('[')) {
