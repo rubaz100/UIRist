@@ -1,7 +1,9 @@
 import React from 'react';
-import { Card, Badge } from 'react-bootstrap';
-import { RistFlow } from '../../types/rist.types';
+import { Card, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { RistFlow } from '../../types';
 import { StatItem } from '../publisher/StatItem';
+import { usePeerBitrateHistory } from '../../hooks/usePeerBitrateHistory';
+import { PeerGraphCard } from './PeerGraphCard';
 
 interface RistFlowCardProps {
   flow: RistFlow;
@@ -22,8 +24,21 @@ function formatBitrate(bps: number): string {
 export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
   const { color, label } = qualityVariant(flow.qualityRatio);
   const qualityPct = (flow.qualityRatio * 100).toFixed(2);
-  const activePeers = flow.peers?.filter(p => p.dead === 0) ?? [];
-  const deadPeers = flow.peers?.filter(p => p.dead !== 0) ?? [];
+  const activePeers = (flow.peers ?? []).filter(p => p.dead === 0);
+  const deadPeers = (flow.peers ?? []).filter(p => p.dead !== 0);
+
+  const { getSamples, reset } = usePeerBitrateHistory(flow);
+
+  // Pill background/border color from quality threshold
+  const qualityBg = flow.qualityRatio >= 0.99
+    ? 'rgba(25,135,84,0.2)'
+    : flow.qualityRatio >= 0.95 ? 'rgba(255,193,7,0.2)' : 'rgba(220,53,69,0.2)';
+  const qualityBorder = flow.qualityRatio >= 0.99
+    ? 'rgba(25,135,84,0.3)'
+    : flow.qualityRatio >= 0.95 ? 'rgba(255,193,7,0.3)' : 'rgba(220,53,69,0.3)';
+  const dotClass = flow.qualityRatio >= 0.99
+    ? 'bg-success pulse'
+    : flow.qualityRatio >= 0.95 ? 'bg-warning' : 'bg-danger';
 
   return (
     <Card className="mb-3">
@@ -42,18 +57,26 @@ export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
             )}
           </div>
 
-          <div
-            className="d-flex align-items-center px-3 py-1 rounded-pill flex-shrink-0"
-            style={{
-              backgroundColor: flow.qualityRatio >= 0.99 ? 'rgba(25,135,84,0.2)' : flow.qualityRatio >= 0.95 ? 'rgba(255,193,7,0.2)' : 'rgba(220,53,69,0.2)',
-              border: `1px solid ${flow.qualityRatio >= 0.99 ? 'rgba(25,135,84,0.3)' : flow.qualityRatio >= 0.95 ? 'rgba(255,193,7,0.3)' : 'rgba(220,53,69,0.3)'}`,
-            }}
-          >
-            <span
-              className={`d-inline-block rounded-circle me-2 ${flow.qualityRatio >= 0.99 ? 'bg-success pulse' : flow.qualityRatio >= 0.95 ? 'bg-warning' : 'bg-danger'}`}
-              style={{ width: 8, height: 8 }}
-            />
-            <span className={`small fw-medium ${color}`}>{label}</span>
+          <div className="d-flex align-items-center gap-2 flex-shrink-0">
+            <OverlayTrigger placement="top" overlay={<Tooltip>Reset graphs — clears the bitrate history for every peer in this flow.</Tooltip>}>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={reset}
+                className="d-flex align-items-center"
+                style={{ padding: '0.15rem 0.45rem' }}
+              >
+                <i className="bi bi-arrow-counterclockwise" style={{ fontSize: '0.85rem' }}></i>
+              </Button>
+            </OverlayTrigger>
+
+            <div
+              className="d-flex align-items-center px-3 py-1 rounded-pill"
+              style={{ backgroundColor: qualityBg, border: `1px solid ${qualityBorder}` }}
+            >
+              <span className={`d-inline-block rounded-circle me-2 ${dotClass}`} style={{ width: 8, height: 8 }} />
+              <span className={`small fw-medium ${color}`}>{label}</span>
+            </div>
           </div>
         </div>
 
@@ -67,7 +90,7 @@ export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
           <StatItem icon="bi bi-hourglass-split" label="Buffer" value={`${flow.avgBufferTime} ms`} />
         </div>
 
-        {/* Peers */}
+        {/* Peer graph grid */}
         {flow.peers?.length > 0 && (
           <div>
             <div className="text-muted small mb-2 d-flex align-items-center gap-2">
@@ -77,23 +100,14 @@ export const RistFlowCard: React.FC<RistFlowCardProps> = ({ flow }) => {
                 {deadPeers.length > 0 && <span className="text-muted"> · {deadPeers.length} dead</span>}
               </span>
             </div>
-            <div className="d-flex flex-column gap-1">
+            <div className="d-flex flex-wrap gap-2">
               {flow.peers.map((peer, index) => (
-                <div key={peer.id} className="d-flex align-items-center gap-2 px-2 py-1 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
-                  <Badge bg={peer.dead === 0 ? 'success' : 'secondary'} style={{ fontSize: '0.65rem' }}>
-                    {peer.dead === 0 ? 'live' : 'dead'}
-                  </Badge>
-                  <span className="small text-muted">
-                    Peer #{index + 1}
-                  </span>
-                  <span className="small ms-auto">
-                    <span className="text-muted me-2">RTT</span>
-                    <span className={peer.rtt > 200 ? 'text-warning' : ''}>{Math.round(peer.rtt)} ms</span>
-                  </span>
-                  <span className="small">
-                    <span className="text-muted me-1">↓</span>{formatBitrate(peer.bitrate)}
-                  </span>
-                </div>
+                <PeerGraphCard
+                  key={peer.id}
+                  peer={peer}
+                  peerIndex={index}
+                  samples={getSamples(peer.id)}
+                />
               ))}
             </div>
           </div>
