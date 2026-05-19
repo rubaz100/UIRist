@@ -33,7 +33,7 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({
   receiver, serverHost, developerMode,
   onDelete, onUpdate, onStartRelay, onStopRelay,
 }) => {
-  const { showPortInUrls, showQrCodes } = useSettings();
+  const { showQrCodes } = useSettings();
   const host = serverHost || 'localhost';
 
   const [editOpen, setEditOpen] = useState(false);
@@ -63,7 +63,6 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({
               host={host}
               port={receiver.listenPort}
               secret={receiver.secret}
-              showPort={showPortInUrls}
               showQrCodes={showQrCodes}
             />
 

@@ -10,19 +10,18 @@ export interface RistUrlOptions {
   host: string;
   port: number;
   secret?: string;
-  /** Show port explicitly. Default false — sender just needs hostname when not on a custom port. */
-  showPort?: boolean;
 }
 
-/** Real RIST input URL (secret embedded). */
-export function buildRistUrl({ host, port, secret, showPort }: RistUrlOptions): string {
-  const base = showPort ? `rist://${host}:${port}` : `rist://${host}`;
+/** Real RIST input URL (secret embedded). Port is always included — the listener
+ *  binds to a specific UDP port, so the sender needs it. */
+export function buildRistUrl({ host, port, secret }: RistUrlOptions): string {
+  const base = `rist://${host}:${port}`;
   return secret ? `${base}?secret=${secret}` : base;
 }
 
 /** Same URL but with the secret masked — for display only. */
-export function buildRistUrlMasked({ host, port, secret, showPort }: RistUrlOptions): string {
-  const base = showPort ? `rist://${host}:${port}` : `rist://${host}`;
+export function buildRistUrlMasked({ host, port, secret }: RistUrlOptions): string {
+  const base = `rist://${host}:${port}`;
   return secret ? `${base}?secret=${MASK}` : base;
 }
 

@@ -9,7 +9,6 @@ export interface PersistedConfig {
   flowHistoryTimeout: number;
   advancedMode: boolean;
   developerMode: boolean;
-  showPortInUrls: boolean;
   showQrCodes: boolean;
 }
 

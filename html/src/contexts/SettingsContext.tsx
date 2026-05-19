@@ -8,7 +8,6 @@ import { useBackendConfigSync } from '../hooks/useBackendConfigSync';
 const LS = {
   advancedMode: 'srt-advanced-mode',
   developerMode: 'developer-mode',
-  showPortInUrls: 'show-port-in-urls',
   showQrCodes: 'show-qr-codes',
   ristApiUrl: 'rist-api-url',
   ristApiKey: 'rist-api-key',
@@ -23,8 +22,6 @@ interface SettingsContextType {
   setAdvancedMode: (enabled: boolean) => void;
   developerMode: boolean;
   setDeveloperMode: (enabled: boolean) => void;
-  showPortInUrls: boolean;
-  setShowPortInUrls: (enabled: boolean) => void;
   showQrCodes: boolean;
   setShowQrCodes: (enabled: boolean) => void;
   ristApiUrl: string;
@@ -53,7 +50,6 @@ const initialRistServerHost = config.ristServerHost.startsWith('{{') ? '' : conf
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [advancedMode, setAdvancedModeLS] = useLocalStorageState<boolean>(LS.advancedMode, false);
   const [developerMode, setDeveloperModeLS] = useLocalStorageState<boolean>(LS.developerMode, false);
-  const [showPortInUrls, setShowPortInUrlsLS] = useLocalStorageState<boolean>(LS.showPortInUrls, false);
   const [showQrCodes, setShowQrCodesLS] = useLocalStorageState<boolean>(LS.showQrCodes, false);
   const [ristApiUrl, setRistApiUrlLS] = useLocalStorageState<string>(LS.ristApiUrl, initialRistApiUrl);
   const [ristApiKey, setRistApiKeyLS] = useLocalStorageState<string>(LS.ristApiKey, '');
@@ -70,7 +66,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const applyConfig = useCallback((cfg: PersistedConfig) => {
     if (cfg.advancedMode !== undefined) setAdvancedModeLS(!!cfg.advancedMode);
     if (cfg.developerMode !== undefined) setDeveloperModeLS(!!cfg.developerMode);
-    if (cfg.showPortInUrls !== undefined) setShowPortInUrlsLS(!!cfg.showPortInUrls);
     if (cfg.showQrCodes !== undefined) setShowQrCodesLS(!!cfg.showQrCodes);
     if (cfg.ristApiUrl) setRistApiUrlLS(cfg.ristApiUrl);
     if (cfg.ristApiKey !== undefined) setRistApiKeyLS(cfg.ristApiKey);
@@ -82,7 +77,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       window.dispatchEvent(new StorageEvent('storage', { key: LS.srtApiKey, newValue: cfg.srtApiKey }));
     }
   }, [
-    setAdvancedModeLS, setDeveloperModeLS, setShowPortInUrlsLS, setShowQrCodesLS,
+    setAdvancedModeLS, setDeveloperModeLS, setShowQrCodesLS,
     setRistApiUrlLS, setRistApiKeyLS, setRistServerHostLS, setFlowHistoryTimeoutLS,
   ]);
 
@@ -99,7 +94,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Wrap each setter to also queue a backend save with the patched key.
   const setAdvancedMode      = useCallback((v: boolean) => { setAdvancedModeLS(v); queueSave({ advancedMode: v }); }, [setAdvancedModeLS, queueSave]);
   const setDeveloperMode     = useCallback((v: boolean) => { setDeveloperModeLS(v); queueSave({ developerMode: v }); }, [setDeveloperModeLS, queueSave]);
-  const setShowPortInUrls    = useCallback((v: boolean) => { setShowPortInUrlsLS(v); queueSave({ showPortInUrls: v }); }, [setShowPortInUrlsLS, queueSave]);
   const setShowQrCodes       = useCallback((v: boolean) => { setShowQrCodesLS(v); queueSave({ showQrCodes: v }); }, [setShowQrCodesLS, queueSave]);
   const setRistApiUrl        = useCallback((v: string)  => { setRistApiUrlLS(v); queueSave({ ristApiUrl: v }); }, [setRistApiUrlLS, queueSave]);
   const setRistApiKey        = useCallback((v: string)  => { setRistApiKeyLS(v); queueSave({ ristApiKey: v }); }, [setRistApiKeyLS, queueSave]);
@@ -109,7 +103,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const value = useMemo<SettingsContextType>(() => ({
     advancedMode, setAdvancedMode,
     developerMode, setDeveloperMode,
-    showPortInUrls, setShowPortInUrls,
     showQrCodes, setShowQrCodes,
     ristApiUrl, setRistApiUrl,
     ristApiKey, setRistApiKey,
@@ -120,10 +113,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     reloadConfig: reload,
     applyImportedConfig: applyConfig,
   }), [
-    advancedMode, developerMode, showPortInUrls, showQrCodes,
+    advancedMode, developerMode, showQrCodes,
     ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout,
     status.error, status.configFile,
-    setAdvancedMode, setDeveloperMode, setShowPortInUrls, setShowQrCodes,
+    setAdvancedMode, setDeveloperMode, setShowQrCodes,
     setRistApiUrl, setRistApiKey, setRistServerHost, setFlowHistoryTimeout,
     reload, applyConfig,
   ]);

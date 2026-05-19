@@ -7,7 +7,6 @@ interface RistUrlPanelProps {
   host: string;
   port: number;
   secret?: string;
-  showPort: boolean;
   showQrCodes: boolean;
 }
 
@@ -15,11 +14,11 @@ interface RistUrlPanelProps {
  * Shows the RIST input URL with show/hide secret toggle, copy button,
  * and optional QR code. Copy always copies the real URL (independent of mask).
  */
-export const RistUrlPanel: React.FC<RistUrlPanelProps> = ({ host, port, secret, showPort, showQrCodes }) => {
+export const RistUrlPanel: React.FC<RistUrlPanelProps> = ({ host, port, secret, showQrCodes }) => {
   const [secretVisible, setSecretVisible] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
-  const opts = { host, port, secret, showPort };
+  const opts = { host, port, secret };
   const url = buildRistUrl(opts);
   const masked = buildRistUrlMasked(opts);
 

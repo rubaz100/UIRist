@@ -18,7 +18,6 @@ const DEFAULT_CONFIG = {
   flowHistoryTimeout: 30,
   advancedMode: false,
   developerMode: false,
-  showPortInUrls: false,
   showQrCodes: false,
 };
 
@@ -31,7 +30,6 @@ const ENV_OVERRIDES = {
   flowHistoryTimeout: 'FLOW_HISTORY_TIMEOUT',
   advancedMode: 'ADVANCED_MODE',
   developerMode: 'DEVELOPER_MODE',
-  showPortInUrls: 'SHOW_PORT_IN_URLS',
   showQrCodes: 'SHOW_QR_CODES',
 };
 
