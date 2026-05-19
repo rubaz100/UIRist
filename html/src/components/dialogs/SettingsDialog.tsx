@@ -271,13 +271,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                 <Form.Check
                   type="switch"
                   id="show-port-switch"
-                  label={<><i className="bi bi-123 me-2 text-warning"></i><strong>Port in RIST-URLs anzeigen</strong></>}
+                  label={<><i className="bi bi-123 me-2 text-warning"></i><strong>Show port in RIST URLs</strong></>}
                   checked={showPortInUrls}
                   onChange={e => setShowPortInUrls(e.target.checked)}
                 />
                 <Form.Text className="text-muted">
                   <i className="bi bi-shield-exclamation me-1 text-warning"></i>
-                  Zeigt den UDP-Port in der RIST-Eingabe-URL. <strong>Sicherheitshinweis:</strong> Der Port ist ohne PSK-Passwort für jeden offen — stelle sicher, dass jeder Receiver ein Passwort hat.
+                  Shows the UDP port in the RIST input URL. <strong>Security note:</strong> the port is open to anyone without a PSK password — make sure every receiver has one set.
                 </Form.Text>
               </Form.Group>
 
@@ -420,12 +420,12 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                 <Form.Check
                   type="switch"
                   id="show-qr-switch"
-                  label={<><i className="bi bi-qr-code me-2 text-info"></i><strong>QR-Codes anzeigen</strong></>}
+                  label={<><i className="bi bi-qr-code me-2 text-info"></i><strong>Show QR codes</strong></>}
                   checked={showQrCodes}
                   onChange={e => setShowQrCodes(e.target.checked)}
                 />
                 <Form.Text className="text-muted">
-                  Zeigt aufklappbare QR-Codes für RIST- und SRT-URLs auf der Receiver-Card.
+                  Adds collapsible QR codes next to RIST and SRT URLs on the receiver card.
                 </Form.Text>
               </Form.Group>
 
