@@ -2,7 +2,7 @@
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const { startSocketServer, stopSocketServer, getPeerIps, getPeerIpMap } = require('./metricsServer');
+const { startSocketServer, stopSocketServer, getPeerIps, getPeerIpMap, parsePeerIp } = require('./metricsServer');
 const ispLookup = require('./ispLookup');
 const { openPort, closePort } = require('./portManager');
 const { saveState, loadState, normalizeRelayConfig } = require('./stateManager');
@@ -240,10 +240,18 @@ function parseFlowsFromLogs(rec) {
     // IPs are observed on the Prometheus metrics socket (separate stream).
     // For each peer.id we look up the IP that librist labelled on its metrics.
     // Missing entries (early polls, mismatched id types) just yield null.
-    const peerIpMap = getPeerIpMap(rec.socketPath, String(fi.flow_id));
-    const peerIps = getPeerIps(rec.socketPath, String(fi.flow_id));
+    const flowId = String(fi.flow_id);
+    const peerIpMap = getPeerIpMap(rec.socketPath, flowId);
+    const fallbackPeerIpMap = getPeerIpMap(rec.socketPath, 'unknown');
+    const peerIps = getPeerIps(rec.socketPath, flowId);
+    const fallbackPeerIps = getPeerIps(rec.socketPath, 'unknown');
     const peers = (fi.peers || []).map((p, index) => {
-      const ip = peerIpMap.get(String(p.id)) || peerIps[index] || null;
+      const ip = getJsonPeerIp(p)
+        || peerIpMap.get(String(p.id))
+        || fallbackPeerIpMap.get(String(p.id))
+        || peerIps[index]
+        || fallbackPeerIps[index]
+        || null;
       const ispInfo = ip ? ispLookup.lookupSync(ip) : null;
       return {
         id: p.id,
@@ -272,6 +280,27 @@ function parseFlowsFromLogs(rec) {
       peers,
     }];
   } catch { return []; }
+}
+
+function getJsonPeerIp(peer) {
+  const candidates = [
+    peer?.peer_url,
+    peer?.peerUrl,
+    peer?.peer_name,
+    peer?.peerName,
+    peer?.url,
+    peer?.address,
+    peer?.ip,
+    peer?.host,
+    peer?.hostname,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const ip = parsePeerIp(candidate);
+    if (ip) return ip;
+  }
+  return null;
 }
 
 function getReceiverFlows(id) {

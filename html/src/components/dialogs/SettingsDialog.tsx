@@ -23,6 +23,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
     ristApiKey, setRistApiKey,
     ristServerHost, setRistServerHost,
     flowHistoryTimeout, setFlowHistoryTimeout,
+    ristStatsZeroDelay, setRistStatsZeroDelay,
     configError, configFile, applyImportedConfig,
   } = useSettings();
 
@@ -32,6 +33,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
   const [localRistApiKey, setLocalRistApiKey] = useState('');
   const [localRistServerHost, setLocalRistServerHost] = useState('');
   const [localFlowHistoryTimeout, setLocalFlowHistoryTimeout] = useState('30');
+  const [localRistStatsZeroDelay, setLocalRistStatsZeroDelay] = useState(false);
   const [success, setSuccess] = useState(false);
 
   // Backup tab state
@@ -52,6 +54,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
       setLocalRistApiKey(ristApiKey);
       setLocalRistServerHost(ristServerHost);
       setLocalFlowHistoryTimeout(String(flowHistoryTimeout));
+      setLocalRistStatsZeroDelay(ristStatsZeroDelay);
       setSuccess(false);
       // reset backup state on open
       setExportPassword('');
@@ -61,7 +64,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
       setBackupError(null);
       setBackupSuccess(null);
     }
-  }, [open, apiKey, ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout]);
+  }, [open, apiKey, ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, ristStatsZeroDelay]);
 
   const handleExport = async () => {
     setBackupError(null);
@@ -140,6 +143,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
     setRistServerHost(localRistServerHost);
     const t = parseInt(localFlowHistoryTimeout, 10);
     setFlowHistoryTimeout(isNaN(t) || t < 0 ? 0 : t);
+    setRistStatsZeroDelay(localRistStatsZeroDelay);
     setSuccess(true);
     setTimeout(() => { onClose(); }, 1000);
   };
@@ -282,6 +286,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                 <Form.Text className="text-muted">
                   Move a flow to history after this many seconds with no active connections.
                   Set to <code>0</code> to disable.
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mt-3">
+                <Form.Check
+                  type="switch"
+                  id="rist-zero-delay-switch"
+                  label={<><i className="bi bi-lightning-charge me-2 text-warning"></i><strong>Experimental 0 ms stats polling</strong></>}
+                  checked={localRistStatsZeroDelay}
+                  onChange={e => setLocalRistStatsZeroDelay(e.target.checked)}
+                />
+                <Form.Text className="text-muted">
+                  Removes the default 5 second delay between RIST stats requests.
                 </Form.Text>
               </Form.Group>
             </>

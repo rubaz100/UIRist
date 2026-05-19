@@ -9,6 +9,7 @@
  * with their real socket address.
  */
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const { parsePrometheus } = require('./metricsFetcher');
 const log = require('./logger');
@@ -96,7 +97,8 @@ function getLatestFlows(socketPath) {
 }
 
 /**
- * Extract a bare IP (without scheme, brackets, or port) from a peer_name label.
+ * Extract a bare IP (without scheme, brackets, or port) from a peer_name /
+ * peer_url label.
  * ristreceiver outputs forms like:
  *   "rist://203.0.113.5:5004"
  *   "rist://[2001:db8::1]:5004"
@@ -115,23 +117,25 @@ function parsePeerIp(peerName) {
   // Bracketed IPv6: "[2001:db8::1]:5004" or "[2001:db8::1]"
   if (s.startsWith('[')) {
     const closing = s.indexOf(']');
-    return closing > 0 ? s.slice(1, closing) : null;
+    const ip = closing > 0 ? s.slice(1, closing) : null;
+    return ip && net.isIP(ip) ? ip : null;
   }
   // Bare IPv6 without brackets — heuristic: more than one colon → no port
   if ((s.match(/:/g) || []).length > 1) {
-    return s;
+    return net.isIP(s) ? s : null;
   }
   // IPv4 with optional port
   const colonIdx = s.indexOf(':');
-  return colonIdx > 0 ? s.slice(0, colonIdx) : s;
+  const ip = colonIdx > 0 ? s.slice(0, colonIdx) : s;
+  return net.isIP(ip) ? ip : null;
 }
 
 /**
  * Parse Prometheus samples into a flow summary plus per-flow peer-IP maps.
  *
- * Each sample's labels can carry `flow_id`, `peer_id`, and `peer_name`. We use
- * `peer_id` (when present) as the key for the IP map so callers can match it to
- * `fi.peers[].id` from the JSON `receiver-stats` stream.
+ * Each sample's labels can carry `flow_id`, `peer_id`, and `peer_name` or
+ * `peer_url`. We use `peer_id` (when present) as the key for the IP map so
+ * callers can match it to `fi.peers[].id` from the JSON `receiver-stats` stream.
  */
 function samplesToFlows(samples, receiverId, receiverName) {
   const flowMap = new Map();
@@ -160,7 +164,7 @@ function samplesToFlows(samples, receiverId, receiverName) {
 
   for (const s of samples) {
     const flowId = s.labels['flow_id'] || s.labels['id'] || 'unknown';
-    const peerName = s.labels['peer_name'] || s.labels['peer'] || '';
+    const peerName = s.labels['peer_name'] || s.labels['peer_url'] || s.labels['peer'] || '';
     const peerId = s.labels['peer_id'] || s.labels['peer'] || null;
     const flow = getOrCreate(flowId, peerName);
 

@@ -20,7 +20,11 @@ const REFRESH_AFTER_CREATE_MS = 1200;
  */
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, developerMode, configError } = useSettings();
+  const {
+    ristApiUrl, ristApiKey, ristServerHost,
+    flowHistoryTimeout, ristStatsZeroDelay,
+    developerMode, configError,
+  } = useSettings();
 
   // Fallback to URL hostname when no explicit server host is configured —
   // works when the API is on the same machine as the stream sender.
@@ -40,7 +44,7 @@ export const PublishersPage: React.FC = () => {
   const {
     flows: ristFlows, historyFlows: ristHistoryFlows,
     loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer,
-  } = useRistStats(ristStatsUrl, ristApiKey, flowHistoryTimeout);
+  } = useRistStats(ristStatsUrl, ristApiKey, flowHistoryTimeout, ristStatsZeroDelay);
   const {
     receivers, loading: receiversLoading,
     createReceiver, updateReceiver, deleteReceiver,

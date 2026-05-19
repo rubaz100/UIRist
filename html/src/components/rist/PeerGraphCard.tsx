@@ -25,6 +25,7 @@ const CHART_HEIGHT = 100;
  */
 export const PeerGraphCard: React.FC<PeerGraphCardProps> = ({ peer, peerIndex, samples }) => {
   const isAlive = peer.dead === 0;
+  const peerLabel = peer.ip || 'IP pending';
   // Slightly dim dead peers but still render them so users see the timeline of when they died.
   const color = isAlive ? '#28c76f' : '#6c757d';
 
@@ -44,7 +45,13 @@ export const PeerGraphCard: React.FC<PeerGraphCardProps> = ({ peer, peerIndex, s
           <Badge bg={isAlive ? 'success' : 'secondary'} style={{ fontSize: '0.6rem' }}>
             {isAlive ? 'live' : 'dead'}
           </Badge>
-          <span className="text-muted" style={{ fontSize: '0.7rem' }}>Peer #{peerIndex + 1}</span>
+          <span
+            className={`text-muted text-truncate ${peer.ip ? 'font-monospace' : ''}`}
+            style={{ fontSize: '0.7rem', maxWidth: 112 }}
+            title={peer.ip || `Peer ${peerIndex + 1}`}
+          >
+            {peerLabel}
+          </span>
         </span>
         <span className="text-muted" style={{ fontSize: '0.65rem' }}>
           RTT <span className={peer.rtt > 200 ? 'text-warning' : ''}>{Math.round(peer.rtt)}ms</span>
@@ -64,7 +71,7 @@ export const PeerGraphCard: React.FC<PeerGraphCardProps> = ({ peer, peerIndex, s
             avg {formatBitrate(peer.avgBitrate)}
           </div>
         )}
-        {peer.ip && (
+        {(peer.isp || peer.country) && (
           <OverlayTrigger
             placement="top"
             overlay={<Tooltip>{[peer.isp, peer.ip].filter(Boolean).join(' · ')}</Tooltip>}
@@ -80,11 +87,9 @@ export const PeerGraphCard: React.FC<PeerGraphCardProps> = ({ peer, peerIndex, s
               {peer.isp ? (
                 <>
                   <span className="text-truncate">{peer.isp}</span>
-                  <span className="opacity-50">·</span>
-                  <span className="font-monospace text-truncate">{peer.ip}</span>
                 </>
               ) : (
-                <span className="font-monospace text-truncate">{peer.ip}</span>
+                <span className="text-truncate">Resolved</span>
               )}
             </div>
           </OverlayTrigger>

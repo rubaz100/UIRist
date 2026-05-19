@@ -7,6 +7,7 @@ export interface PersistedConfig {
   ristApiUrl: string;
   ristServerHost: string;
   flowHistoryTimeout: number;
+  ristStatsZeroDelay: boolean;
   advancedMode: boolean;
   developerMode: boolean;
   showQrCodes: boolean;

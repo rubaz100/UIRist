@@ -19,6 +19,7 @@ export const useRistStats = (
   apiUrl: string,
   apiKey: string = '',
   flowHistoryTimeout: number = 30,
+  zeroDelayPolling: boolean = false,
 ): UseRistStatsResult => {
   const [flows, setFlows] = useState<RistFlow[]>([]);
   const [historyFlows, setHistoryFlows] = useState<HistoryFlow[]>([]);
@@ -102,10 +103,11 @@ export const useRistStats = (
   }, [apiUrl, apiKey, flowHistoryTimeout]);
 
   useEffect(() => {
+    if (zeroDelayPolling) return;
     fetchFlows();
-  }, [fetchFlows]);
+  }, [fetchFlows, zeroDelayPolling]);
 
-  const secondsUntilUpdate = useRefreshTimer(fetchFlows, REFRESH_INTERVAL);
+  const secondsUntilUpdate = useRefreshTimer(fetchFlows, zeroDelayPolling ? 0 : REFRESH_INTERVAL);
 
   return { flows, historyFlows, loading, error, secondsUntilUpdate };
 };

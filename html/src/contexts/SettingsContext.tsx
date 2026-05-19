@@ -13,6 +13,7 @@ const LS = {
   ristApiKey: 'rist-api-key',
   ristServerHost: 'rist-server-host',
   flowHistoryTimeout: 'rist-flow-history-timeout',
+  ristStatsZeroDelay: 'rist-stats-zero-delay',
   // Cross-context bridge — AuthContext listens for storage events on this key.
   srtApiKey: 'srt-api-key',
 } as const;
@@ -32,6 +33,8 @@ interface SettingsContextType {
   setRistServerHost: (host: string) => void;
   flowHistoryTimeout: number;
   setFlowHistoryTimeout: (s: number) => void;
+  ristStatsZeroDelay: boolean;
+  setRistStatsZeroDelay: (enabled: boolean) => void;
   // Backend persistence status
   configError: string | null;
   configFile: string | null;
@@ -55,6 +58,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [ristApiKey, setRistApiKeyLS] = useLocalStorageState<string>(LS.ristApiKey, '');
   const [ristServerHost, setRistServerHostLS] = useLocalStorageState<string>(LS.ristServerHost, initialRistServerHost);
   const [flowHistoryTimeout, setFlowHistoryTimeoutLS] = useLocalStorageState<number>(LS.flowHistoryTimeout, 30);
+  const [ristStatsZeroDelay, setRistStatsZeroDelayLS] = useLocalStorageState<boolean>(LS.ristStatsZeroDelay, false);
 
   /**
    * Apply a config object from the backend (or imported file) to local state.
@@ -71,6 +75,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (cfg.ristApiKey !== undefined) setRistApiKeyLS(cfg.ristApiKey);
     if (cfg.ristServerHost !== undefined) setRistServerHostLS(cfg.ristServerHost);
     if (cfg.flowHistoryTimeout !== undefined) setFlowHistoryTimeoutLS(Number(cfg.flowHistoryTimeout));
+    if (cfg.ristStatsZeroDelay !== undefined) setRistStatsZeroDelayLS(!!cfg.ristStatsZeroDelay);
     if (cfg.srtApiKey !== undefined) {
       // Propagate to AuthContext via localStorage + manual storage event
       try { localStorage.setItem(LS.srtApiKey, cfg.srtApiKey); } catch {}
@@ -78,7 +83,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [
     setAdvancedModeLS, setDeveloperModeLS, setShowQrCodesLS,
-    setRistApiUrlLS, setRistApiKeyLS, setRistServerHostLS, setFlowHistoryTimeoutLS,
+    setRistApiUrlLS, setRistApiKeyLS, setRistServerHostLS, setFlowHistoryTimeoutLS, setRistStatsZeroDelayLS,
   ]);
 
   const { status, queueSave, reload } = useBackendConfigSync({
@@ -99,6 +104,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const setRistApiKey        = useCallback((v: string)  => { setRistApiKeyLS(v); queueSave({ ristApiKey: v }); }, [setRistApiKeyLS, queueSave]);
   const setRistServerHost    = useCallback((v: string)  => { setRistServerHostLS(v); queueSave({ ristServerHost: v }); }, [setRistServerHostLS, queueSave]);
   const setFlowHistoryTimeout= useCallback((v: number)  => { setFlowHistoryTimeoutLS(v); queueSave({ flowHistoryTimeout: v }); }, [setFlowHistoryTimeoutLS, queueSave]);
+  const setRistStatsZeroDelay= useCallback((v: boolean) => { setRistStatsZeroDelayLS(v); queueSave({ ristStatsZeroDelay: v }); }, [setRistStatsZeroDelayLS, queueSave]);
 
   const value = useMemo<SettingsContextType>(() => ({
     advancedMode, setAdvancedMode,
@@ -108,16 +114,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     ristApiKey, setRistApiKey,
     ristServerHost, setRistServerHost,
     flowHistoryTimeout, setFlowHistoryTimeout,
+    ristStatsZeroDelay, setRistStatsZeroDelay,
     configError: status.error,
     configFile: status.configFile,
     reloadConfig: reload,
     applyImportedConfig: applyConfig,
   }), [
     advancedMode, developerMode, showQrCodes,
-    ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout,
+    ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, ristStatsZeroDelay,
     status.error, status.configFile,
     setAdvancedMode, setDeveloperMode, setShowQrCodes,
-    setRistApiUrl, setRistApiKey, setRistServerHost, setFlowHistoryTimeout,
+    setRistApiUrl, setRistApiKey, setRistServerHost, setFlowHistoryTimeout, setRistStatsZeroDelay,
     reload, applyConfig,
   ]);
 
