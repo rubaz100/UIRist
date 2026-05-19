@@ -61,6 +61,8 @@ Settings and API keys are auto-saved to **`./data/config.json`** (created on fir
 - File permissions: `0600` (owner-only read/write)
 - Env vars override file values: `RIST_API_KEY`, `SRT_API_KEY`, `RIST_API_URL`, etc.
 
+RIST receivers and their configured SRT relay port/passphrase are saved to **`./data/receivers.json`** and restored by the RIST API on startup.
+
 ### Backup & Restore
 
 **Export encrypted backup** (from UI):

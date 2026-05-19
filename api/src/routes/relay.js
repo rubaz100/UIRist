@@ -3,16 +3,17 @@ const express = require('express');
 const log = require('../logger');
 const { auth } = require('../middleware/auth');
 const { RESERVED_PORTS } = require('../portChecker');
-const { getReceiver, getUsedPorts } = require('../receiverManager');
-const { startRelay, stopRelay, getRelay, getRelayLogs } = require('../relayManager');
+const { getReceiver, getUsedPorts, startReceiverRelay, stopReceiverRelay } = require('../receiverManager');
+const { getRelayLogs } = require('../relayManager');
 const { validateSrtPort, validatePassphrase } = require('../validators/relay');
 
 const router = express.Router();
 
 router.get('/api/receivers/:id/relay', auth, (req, res) => {
-  const relay = getRelay(req.params.id);
-  if (!relay) return res.status(404).json({ error: 'No relay running for this receiver' });
-  res.json(relay);
+  const rec = getReceiver(req.params.id);
+  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
+  if (!rec.relay) return res.status(404).json({ error: 'No relay configured for this receiver' });
+  res.json(rec.relay);
 });
 
 router.get('/api/receivers/:id/relay/logs', auth, (req, res) => {
@@ -40,7 +41,7 @@ router.post('/api/receivers/:id/relay', auth, async (req, res) => {
   if (passError) return res.status(400).json({ error: passError });
 
   try {
-    const relay = await startRelay(req.params.id, rec.outputUrl, srtPort, passphrase?.trim());
+    const relay = await startReceiverRelay(req.params.id, srtPort, passphrase?.trim());
     res.status(201).json(relay);
   } catch (err) {
     log.error('Failed to start relay', { error: err.message });
@@ -49,7 +50,9 @@ router.post('/api/receivers/:id/relay', auth, async (req, res) => {
 });
 
 router.delete('/api/receivers/:id/relay', auth, (req, res) => {
-  const ok = stopRelay(req.params.id);
+  const rec = getReceiver(req.params.id);
+  if (!rec) return res.status(404).json({ error: 'Receiver not found' });
+  const ok = stopReceiverRelay(req.params.id);
   if (!ok) return res.status(404).json({ error: 'No relay found for this receiver' });
   res.json({ success: true });
 });

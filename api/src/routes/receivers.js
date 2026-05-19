@@ -4,7 +4,16 @@ const log = require('../logger');
 const { auth } = require('../middleware/auth');
 const { createReceiverLimiter } = require('../middleware/rateLimits');
 const { RESERVED_PORTS } = require('../portChecker');
-const { startReceiver, stopReceiver, listReceivers, getReceiver, receivers } = require('../receiverManager');
+const {
+  startReceiver,
+  stopReceiver,
+  startReceiverRelay,
+  listReceivers,
+  getReceiver,
+  persistState,
+  receivers,
+} = require('../receiverManager');
+const { normalizeRelayConfig } = require('../stateManager');
 const { validateCreatePayload, validateUpdatePayload } = require('../validators/receiver');
 
 const router = express.Router();
@@ -53,7 +62,7 @@ router.post('/api/receivers', auth, createReceiverLimiter, async (req, res) => {
 
 // ── Update (name | secret | outputUrl). Port stays fixed while running. ──
 router.put('/api/receivers/:id', auth, async (req, res) => {
-  const rec = getReceiver(req.params.id);
+  const rec = receivers.get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Receiver not found' });
 
   const body = req.body || {};
@@ -66,8 +75,7 @@ router.put('/api/receivers/:id', auth, async (req, res) => {
   if (body.outputUrl !== undefined) updates.outputUrl = body.outputUrl.trim();
 
   if (Object.keys(updates).length === 0) {
-    const { _proc, ...pub } = rec;
-    return res.json(pub);
+    return res.json(getReceiver(req.params.id));
   }
 
   try {
@@ -75,6 +83,7 @@ router.put('/api/receivers/:id', auth, async (req, res) => {
     // so we must restart the process for those changes to take effect.
     // Name is just metadata and can be updated in-place.
     const needsRestart = updates.secret || updates.outputUrl;
+    const relayConfig = normalizeRelayConfig(rec.relay);
 
     if (needsRestart) {
       stopReceiver(req.params.id);
@@ -85,14 +94,17 @@ router.put('/api/receivers/:id', auth, async (req, res) => {
         secret: updates.secret || rec.secret,
         outputUrl: updates.outputUrl || rec.outputUrl,
         createdAt: rec.createdAt,
+        relay: relayConfig,
       });
-      const { _proc, ...pub } = newRec;
-      return res.json(pub);
+      if (relayConfig) {
+        await startReceiverRelay(newRec.id, relayConfig.srtPort, relayConfig.passphrase);
+      }
+      return res.json(getReceiver(newRec.id));
     }
 
     rec.name = updates.name;
-    const { _proc, ...pub } = rec;
-    res.json(pub);
+    persistState();
+    res.json(getReceiver(req.params.id));
   } catch (err) {
     log.error('Failed to update receiver', { error: err.message });
     res.status(500).json({ error: err.message });

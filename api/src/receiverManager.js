@@ -5,8 +5,12 @@ const crypto = require('crypto');
 const { startSocketServer, stopSocketServer, getPeerIpMap } = require('./metricsServer');
 const ispLookup = require('./ispLookup');
 const { openPort, closePort } = require('./portManager');
-const { saveState, loadState } = require('./stateManager');
-const { getRelay, stopRelay: stopReceiverRelay } = require('./relayManager');
+const { saveState, loadState, normalizeRelayConfig } = require('./stateManager');
+const {
+  startRelay: startLiveRelay,
+  stopRelay: stopLiveRelay,
+  getRelay,
+} = require('./relayManager');
 const { isUdpPortAvailable } = require('./portChecker');
 const log = require('./logger');
 
@@ -33,12 +37,16 @@ function findBinary() {
 const BINARY = findBinary();
 const receivers = new Map();
 
+function persistState() {
+  saveState(receivers);
+}
+
 function generateSecret() {
   // 16 URL-safe random bytes → 22 base64url chars, no special chars
   return crypto.randomBytes(16).toString('base64url');
 }
 
-async function startReceiver({ name, listenPort, outputUrl, secret, id: existingId, createdAt: existingCreatedAt } = {}) {
+async function startReceiver({ name, listenPort, outputUrl, secret, id: existingId, createdAt: existingCreatedAt, relay } = {}) {
   if (!BINARY) {
     throw new Error('ristreceiver binary not found. Install librist: brew install librist');
   }
@@ -82,6 +90,8 @@ async function startReceiver({ name, listenPort, outputUrl, secret, id: existing
     logs: [],
     lastJsonStats: null, // most recent receiver-stats JSON line — survives log buffer flood
   };
+  const relayConfig = normalizeRelayConfig(relay);
+  if (relayConfig) record.relay = relayConfig;
 
   const processChunk = (chunk) => {
     // Split chunk into individual lines — data events can contain multiple lines
@@ -108,34 +118,60 @@ async function startReceiver({ name, listenPort, outputUrl, secret, id: existing
     record.status = 'running';
     log.info('Receiver started', { id, name: recName, port: listenPort });
     openPort(listenPort, 'udp');                            // RIST input
-    saveState(receivers);
+    persistState();
   });
   proc.on('error', (err) => {
     record.status = 'error';
     record.error = err.message;
     log.error('Receiver process error', { id, name: recName, error: err.message });
     stopSocketServer(socketPath);
-    saveState(receivers);
+    persistState();
   });
   proc.on('exit', (code) => {
     record.status = code === 0 ? 'stopped' : 'error';
     record.pid = null;
     log.info('Receiver exited', { id, name: recName, code });
     stopSocketServer(socketPath);
-    saveState(receivers);
+    persistState();
   });
 
   setTimeout(() => {
     if (record.status === 'starting') {
       record.status = 'running';
-      saveState(receivers);
+      persistState();
     }
   }, 1500);
 
   record._proc = proc;
   receivers.set(id, record);
-  saveState(receivers);
+  persistState();
   return record;
+}
+
+async function startReceiverRelay(receiverId, srtPort, passphrase) {
+  const rec = receivers.get(receiverId);
+  if (!rec) throw new Error('Receiver not found');
+
+  const relay = await startLiveRelay(receiverId, rec.outputUrl, srtPort, passphrase);
+  const relayConfig = normalizeRelayConfig(relay);
+  if (relayConfig) {
+    rec.relay = relayConfig;
+    persistState();
+  }
+  return relay;
+}
+
+function stopReceiverRelay(receiverId) {
+  const rec = receivers.get(receiverId);
+  const hadPersistedRelay = !!normalizeRelayConfig(rec?.relay);
+  const stoppedLiveRelay = stopLiveRelay(receiverId);
+
+  if (rec && hadPersistedRelay) {
+    delete rec.relay;
+    persistState();
+  }
+
+  return stoppedLiveRelay || hadPersistedRelay;
 }
 
 function stopReceiver(id) {
@@ -144,11 +180,11 @@ function stopReceiver(id) {
   if (rec._proc) rec._proc.kill('SIGTERM');
   stopSocketServer(rec.socketPath);
   closePort(rec.listenPort, 'udp');
-  stopReceiverRelay(id); // stop ffmpeg relay if running
+  stopLiveRelay(id); // stop ffmpeg relay if running
   rec.status = 'stopped';
   receivers.delete(id);
   log.info('Receiver stopped', { id, name: rec.name });
-  saveState(receivers);
+  persistState();
   return true;
 }
 
@@ -157,9 +193,26 @@ async function restoreState() {
   if (!saved.length) return;
   log.info(`Restoring ${saved.length} receiver(s) from state`);
   for (const rec of saved) {
+    const relayConfig = normalizeRelayConfig(rec.relay);
     try {
-      await startReceiver({ name: rec.name, listenPort: rec.listenPort, outputUrl: rec.outputUrl, secret: rec.secret, id: rec.id, createdAt: rec.createdAt });
+      await startReceiver({
+        name: rec.name,
+        listenPort: rec.listenPort,
+        outputUrl: rec.outputUrl,
+        secret: rec.secret,
+        id: rec.id,
+        createdAt: rec.createdAt,
+        relay: relayConfig,
+      });
       log.info('Receiver restored', { name: rec.name, port: rec.listenPort });
+      if (relayConfig) {
+        try {
+          await startReceiverRelay(rec.id, relayConfig.srtPort, relayConfig.passphrase);
+          log.info('Relay restored', { receiverId: rec.id, srtPort: relayConfig.srtPort });
+        } catch (relayErr) {
+          log.error('Failed to restore relay', { receiverId: rec.id, error: relayErr.message });
+        }
+      }
     } catch (err) {
       log.error('Failed to restore receiver', { name: rec.name, error: err.message });
     }
@@ -243,9 +296,32 @@ function getReceiver(id) {
   return rec ? toPublic(rec) : null;
 }
 
+function parseUdpPort(outputUrl) {
+  try {
+    return parseInt(new URL(outputUrl).port, 10) || null;
+  } catch { return null; }
+}
+
 function toPublic({ _proc, ...pub }) {
   const relay = getRelay(pub.id);
-  return relay ? { ...pub, relay } : { ...pub, relay: null };
+  if (relay) return { ...pub, relay };
+
+  const savedRelay = normalizeRelayConfig(pub.relay);
+  if (savedRelay) {
+    return {
+      ...pub,
+      relay: {
+        receiverId: pub.id,
+        udpPort: parseUdpPort(pub.outputUrl),
+        srtPort: savedRelay.srtPort,
+        passphrase: savedRelay.passphrase || '',
+        status: 'stopped',
+        pid: null,
+      },
+    };
+  }
+
+  return { ...pub, relay: null };
 }
 
 function getBinaryStatus() {
@@ -262,6 +338,7 @@ function getUsedPorts() {
 restoreState();
 
 module.exports = {
-  startReceiver, stopReceiver, listReceivers, getReceiver,
+  startReceiver, stopReceiver, startReceiverRelay, stopReceiverRelay,
+  listReceivers, getReceiver, persistState,
   getReceiverFlows, getAllFlows, getBinaryStatus, getUsedPorts, receivers,
 };
