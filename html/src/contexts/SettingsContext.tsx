@@ -1,6 +1,22 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, ReactNode } from 'react';
 import config from '../config';
-import { ristApiService, PersistedConfig } from '../services/rist-api.service';
+import { PersistedConfig } from '../types';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { useBackendConfigSync } from '../hooks/useBackendConfigSync';
+
+// ── localStorage keys (kept stable for backward compat with existing installs) ──
+const LS = {
+  advancedMode: 'srt-advanced-mode',
+  developerMode: 'developer-mode',
+  showPortInUrls: 'show-port-in-urls',
+  showQrCodes: 'show-qr-codes',
+  ristApiUrl: 'rist-api-url',
+  ristApiKey: 'rist-api-key',
+  ristServerHost: 'rist-server-host',
+  flowHistoryTimeout: 'rist-flow-history-timeout',
+  // Cross-context bridge — AuthContext listens for storage events on this key.
+  srtApiKey: 'srt-api-key',
+} as const;
 
 interface SettingsContextType {
   advancedMode: boolean;
@@ -19,7 +35,7 @@ interface SettingsContextType {
   setRistServerHost: (host: string) => void;
   flowHistoryTimeout: number;
   setFlowHistoryTimeout: (s: number) => void;
-  // Backend config persistence status
+  // Backend persistence status
   configError: string | null;
   configFile: string | null;
   reloadConfig: () => Promise<void>;
@@ -28,228 +44,95 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+// Resolve initial defaults: prefer build-time injected values unless they're
+// still the unreplaced `{{PLACEHOLDER}}` tokens (which means the bundle was
+// served without runtime substitution).
+const initialRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
+const initialRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
+
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [advancedMode, setAdvancedModeState] = useState<boolean>(false);
-  const [developerMode, setDeveloperModeState] = useState<boolean>(false);
-  const [showPortInUrls, setShowPortInUrlsState] = useState<boolean>(false);
-  const [showQrCodes, setShowQrCodesState] = useState<boolean>(false);
-  const rawRistApiUrl = config.ristApiUrl.startsWith('{{') ? 'http://localhost:3001' : config.ristApiUrl;
-  const rawRistServerHost = config.ristServerHost.startsWith('{{') ? '' : config.ristServerHost;
-  const [ristApiUrl, setRistApiUrlState] = useState<string>(rawRistApiUrl);
-  const [ristApiKey, setRistApiKeyState] = useState<string>('');
-  const [ristServerHost, setRistServerHostState] = useState<string>(rawRistServerHost);
-  const [flowHistoryTimeout, setFlowHistoryTimeoutState] = useState<number>(30);
+  const [advancedMode, setAdvancedModeLS] = useLocalStorageState<boolean>(LS.advancedMode, false);
+  const [developerMode, setDeveloperModeLS] = useLocalStorageState<boolean>(LS.developerMode, false);
+  const [showPortInUrls, setShowPortInUrlsLS] = useLocalStorageState<boolean>(LS.showPortInUrls, false);
+  const [showQrCodes, setShowQrCodesLS] = useLocalStorageState<boolean>(LS.showQrCodes, false);
+  const [ristApiUrl, setRistApiUrlLS] = useLocalStorageState<string>(LS.ristApiUrl, initialRistApiUrl);
+  const [ristApiKey, setRistApiKeyLS] = useLocalStorageState<string>(LS.ristApiKey, '');
+  const [ristServerHost, setRistServerHostLS] = useLocalStorageState<string>(LS.ristServerHost, initialRistServerHost);
+  const [flowHistoryTimeout, setFlowHistoryTimeoutLS] = useLocalStorageState<number>(LS.flowHistoryTimeout, 30);
 
-  const [configError, setConfigError] = useState<string | null>(null);
-  const [configFile, setConfigFile] = useState<string | null>(null);
-  const initialLoadDone = useRef(false);
-
-  // Push a single key/value to backend (debounced via simple ref-based scheduler)
-  const pendingUpdates = useRef<Partial<PersistedConfig>>({});
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const queueBackendSave = (patch: Partial<PersistedConfig>) => {
-    if (!initialLoadDone.current) return; // don't save during initial hydration
-    pendingUpdates.current = { ...pendingUpdates.current, ...patch };
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      const updates = pendingUpdates.current;
-      pendingUpdates.current = {};
-      try {
-        const apiUrl = (localStorage.getItem('rist-api-url') || rawRistApiUrl);
-        const apiKey = localStorage.getItem('rist-api-key') || '';
-        if (!apiUrl || apiUrl.startsWith('{{')) return;
-        ristApiService.setBaseUrl(apiUrl);
-        ristApiService.setApiKey(apiKey);
-        await ristApiService.savePersistedConfig(updates);
-      } catch (err: any) {
-        // Silent fail — localStorage is the authoritative client copy
-        console.warn('Failed to sync settings to backend:', err?.message);
-      }
-    }, 500);
-  };
-
-  // Initial load: localStorage first (instant) then backend (override + error report)
-  useEffect(() => {
-    const savedAdvancedMode = localStorage.getItem('srt-advanced-mode');
-    if (savedAdvancedMode === 'true') setAdvancedModeState(true);
-
-    const savedDeveloperMode = localStorage.getItem('developer-mode');
-    if (savedDeveloperMode === 'true') setDeveloperModeState(true);
-
-    const savedShowPortInUrls = localStorage.getItem('show-port-in-urls');
-    if (savedShowPortInUrls === 'true') setShowPortInUrlsState(true);
-
-    const savedShowQrCodes = localStorage.getItem('show-qr-codes');
-    if (savedShowQrCodes === 'true') setShowQrCodesState(true);
-
-    const savedRistApiUrl = localStorage.getItem('rist-api-url');
-    if (savedRistApiUrl) setRistApiUrlState(savedRistApiUrl);
-
-    const savedRistApiKey = localStorage.getItem('rist-api-key');
-    if (savedRistApiKey) setRistApiKeyState(savedRistApiKey);
-
-    const savedRistServerHost = localStorage.getItem('rist-server-host');
-    if (savedRistServerHost) setRistServerHostState(savedRistServerHost);
-
-    const savedFlowHistoryTimeout = localStorage.getItem('rist-flow-history-timeout');
-    if (savedFlowHistoryTimeout !== null) setFlowHistoryTimeoutState(Number(savedFlowHistoryTimeout));
-
-    // Now try to load from backend (will override localStorage if successful)
-    (async () => {
-      const apiUrl = savedRistApiUrl || rawRistApiUrl;
-      const apiKey = savedRistApiKey || '';
-      if (!apiUrl || apiUrl.startsWith('{{')) {
-        initialLoadDone.current = true;
-        return;
-      }
-      try {
-        ristApiService.setBaseUrl(apiUrl);
-        ristApiService.setApiKey(apiKey);
-        const res = await ristApiService.getPersistedConfig();
-        applyConfigFromBackend(res.config);
-        setConfigError(res.error);
-        setConfigFile(res.configFile);
-      } catch (err: any) {
-        const status = err?.response?.status;
-        if (status === 401) {
-          // Auth required — keep localStorage values, don't show as error
-          setConfigError(null);
-        } else {
-          setConfigError(err?.response?.data?.error ?? err?.message ?? 'Failed to load persisted config');
-        }
-      } finally {
-        initialLoadDone.current = true;
-      }
-    })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const applyConfigFromBackend = (cfg: PersistedConfig) => {
-    if (cfg.advancedMode !== undefined) {
-      setAdvancedModeState(!!cfg.advancedMode);
-      localStorage.setItem('srt-advanced-mode', String(!!cfg.advancedMode));
-    }
-    if (cfg.developerMode !== undefined) {
-      setDeveloperModeState(!!cfg.developerMode);
-      localStorage.setItem('developer-mode', String(!!cfg.developerMode));
-    }
-    if (cfg.showPortInUrls !== undefined) {
-      setShowPortInUrlsState(!!cfg.showPortInUrls);
-      localStorage.setItem('show-port-in-urls', String(!!cfg.showPortInUrls));
-    }
-    if (cfg.showQrCodes !== undefined) {
-      setShowQrCodesState(!!cfg.showQrCodes);
-      localStorage.setItem('show-qr-codes', String(!!cfg.showQrCodes));
-    }
-    if (cfg.ristApiUrl) {
-      setRistApiUrlState(cfg.ristApiUrl);
-      localStorage.setItem('rist-api-url', cfg.ristApiUrl);
-    }
-    if (cfg.ristApiKey !== undefined) {
-      setRistApiKeyState(cfg.ristApiKey);
-      localStorage.setItem('rist-api-key', cfg.ristApiKey);
-    }
-    if (cfg.ristServerHost !== undefined) {
-      setRistServerHostState(cfg.ristServerHost);
-      localStorage.setItem('rist-server-host', cfg.ristServerHost);
-    }
-    if (cfg.flowHistoryTimeout !== undefined) {
-      setFlowHistoryTimeoutState(Number(cfg.flowHistoryTimeout));
-      localStorage.setItem('rist-flow-history-timeout', String(cfg.flowHistoryTimeout));
-    }
+  /**
+   * Apply a config object from the backend (or imported file) to local state.
+   * Bypasses the debounced backend save (no re-sync loop) by writing to localStorage
+   * directly through the LS setters — these don't trigger queueSave().
+   *
+   * Also dispatches a synthetic storage event on the SRT key so AuthContext picks it up.
+   */
+  const applyConfig = useCallback((cfg: PersistedConfig) => {
+    if (cfg.advancedMode !== undefined) setAdvancedModeLS(!!cfg.advancedMode);
+    if (cfg.developerMode !== undefined) setDeveloperModeLS(!!cfg.developerMode);
+    if (cfg.showPortInUrls !== undefined) setShowPortInUrlsLS(!!cfg.showPortInUrls);
+    if (cfg.showQrCodes !== undefined) setShowQrCodesLS(!!cfg.showQrCodes);
+    if (cfg.ristApiUrl) setRistApiUrlLS(cfg.ristApiUrl);
+    if (cfg.ristApiKey !== undefined) setRistApiKeyLS(cfg.ristApiKey);
+    if (cfg.ristServerHost !== undefined) setRistServerHostLS(cfg.ristServerHost);
+    if (cfg.flowHistoryTimeout !== undefined) setFlowHistoryTimeoutLS(Number(cfg.flowHistoryTimeout));
     if (cfg.srtApiKey !== undefined) {
-      // Forwarded to AuthContext via localStorage (existing key it watches)
-      localStorage.setItem('srt-api-key', cfg.srtApiKey);
-      // Notify AuthContext via storage event (cross-component bridge)
-      window.dispatchEvent(new StorageEvent('storage', { key: 'srt-api-key', newValue: cfg.srtApiKey }));
+      // Propagate to AuthContext via localStorage + manual storage event
+      try { localStorage.setItem(LS.srtApiKey, cfg.srtApiKey); } catch {}
+      window.dispatchEvent(new StorageEvent('storage', { key: LS.srtApiKey, newValue: cfg.srtApiKey }));
     }
-  };
+  }, [
+    setAdvancedModeLS, setDeveloperModeLS, setShowPortInUrlsLS, setShowQrCodesLS,
+    setRistApiUrlLS, setRistApiKeyLS, setRistServerHostLS, setFlowHistoryTimeoutLS,
+  ]);
 
-  const reloadConfig = async () => {
-    try {
-      ristApiService.setBaseUrl(ristApiUrl);
-      ristApiService.setApiKey(ristApiKey);
-      const res = await ristApiService.getPersistedConfig();
-      applyConfigFromBackend(res.config);
-      setConfigError(res.error);
-      setConfigFile(res.configFile);
-    } catch (err: any) {
-      setConfigError(err?.response?.data?.error ?? err?.message ?? 'Failed to load persisted config');
-    }
-  };
+  const { status, queueSave, reload } = useBackendConfigSync({
+    // Read latest values from localStorage at request-time — useState closure
+    // would capture stale values during the initial load.
+    getCredentials: () => ({
+      apiUrl: (typeof window !== 'undefined' ? localStorage.getItem(LS.ristApiUrl) : null) || initialRistApiUrl,
+      apiKey: (typeof window !== 'undefined' ? localStorage.getItem(LS.ristApiKey) : null) || '',
+    }),
+    onLoad: applyConfig,
+  });
 
-  const applyImportedConfig = (cfg: PersistedConfig) => {
-    applyConfigFromBackend(cfg);
-    setConfigError(null);
-  };
+  // Wrap each setter to also queue a backend save with the patched key.
+  const setAdvancedMode      = useCallback((v: boolean) => { setAdvancedModeLS(v); queueSave({ advancedMode: v }); }, [setAdvancedModeLS, queueSave]);
+  const setDeveloperMode     = useCallback((v: boolean) => { setDeveloperModeLS(v); queueSave({ developerMode: v }); }, [setDeveloperModeLS, queueSave]);
+  const setShowPortInUrls    = useCallback((v: boolean) => { setShowPortInUrlsLS(v); queueSave({ showPortInUrls: v }); }, [setShowPortInUrlsLS, queueSave]);
+  const setShowQrCodes       = useCallback((v: boolean) => { setShowQrCodesLS(v); queueSave({ showQrCodes: v }); }, [setShowQrCodesLS, queueSave]);
+  const setRistApiUrl        = useCallback((v: string)  => { setRistApiUrlLS(v); queueSave({ ristApiUrl: v }); }, [setRistApiUrlLS, queueSave]);
+  const setRistApiKey        = useCallback((v: string)  => { setRistApiKeyLS(v); queueSave({ ristApiKey: v }); }, [setRistApiKeyLS, queueSave]);
+  const setRistServerHost    = useCallback((v: string)  => { setRistServerHostLS(v); queueSave({ ristServerHost: v }); }, [setRistServerHostLS, queueSave]);
+  const setFlowHistoryTimeout= useCallback((v: number)  => { setFlowHistoryTimeoutLS(v); queueSave({ flowHistoryTimeout: v }); }, [setFlowHistoryTimeoutLS, queueSave]);
 
-  const setAdvancedMode = (enabled: boolean) => {
-    setAdvancedModeState(enabled);
-    localStorage.setItem('srt-advanced-mode', enabled.toString());
-    queueBackendSave({ advancedMode: enabled });
-  };
+  const value = useMemo<SettingsContextType>(() => ({
+    advancedMode, setAdvancedMode,
+    developerMode, setDeveloperMode,
+    showPortInUrls, setShowPortInUrls,
+    showQrCodes, setShowQrCodes,
+    ristApiUrl, setRistApiUrl,
+    ristApiKey, setRistApiKey,
+    ristServerHost, setRistServerHost,
+    flowHistoryTimeout, setFlowHistoryTimeout,
+    configError: status.error,
+    configFile: status.configFile,
+    reloadConfig: reload,
+    applyImportedConfig: applyConfig,
+  }), [
+    advancedMode, developerMode, showPortInUrls, showQrCodes,
+    ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout,
+    status.error, status.configFile,
+    setAdvancedMode, setDeveloperMode, setShowPortInUrls, setShowQrCodes,
+    setRistApiUrl, setRistApiKey, setRistServerHost, setFlowHistoryTimeout,
+    reload, applyConfig,
+  ]);
 
-  const setDeveloperMode = (enabled: boolean) => {
-    setDeveloperModeState(enabled);
-    localStorage.setItem('developer-mode', enabled.toString());
-    queueBackendSave({ developerMode: enabled });
-  };
-
-  const setShowPortInUrls = (enabled: boolean) => {
-    setShowPortInUrlsState(enabled);
-    localStorage.setItem('show-port-in-urls', enabled.toString());
-    queueBackendSave({ showPortInUrls: enabled });
-  };
-
-  const setShowQrCodes = (enabled: boolean) => {
-    setShowQrCodesState(enabled);
-    localStorage.setItem('show-qr-codes', enabled.toString());
-    queueBackendSave({ showQrCodes: enabled });
-  };
-
-  const setRistApiUrl = (url: string) => {
-    setRistApiUrlState(url);
-    localStorage.setItem('rist-api-url', url);
-    queueBackendSave({ ristApiUrl: url });
-  };
-
-  const setRistApiKey = (key: string) => {
-    setRistApiKeyState(key);
-    localStorage.setItem('rist-api-key', key);
-    queueBackendSave({ ristApiKey: key });
-  };
-
-  const setRistServerHost = (host: string) => {
-    setRistServerHostState(host);
-    localStorage.setItem('rist-server-host', host);
-    queueBackendSave({ ristServerHost: host });
-  };
-
-  const setFlowHistoryTimeout = (s: number) => {
-    setFlowHistoryTimeoutState(s);
-    localStorage.setItem('rist-flow-history-timeout', String(s));
-    queueBackendSave({ flowHistoryTimeout: s });
-  };
-
-  return (
-    <SettingsContext.Provider value={{
-      advancedMode, setAdvancedMode,
-      developerMode, setDeveloperMode,
-      showPortInUrls, setShowPortInUrls,
-      showQrCodes, setShowQrCodes,
-      ristApiUrl, setRistApiUrl,
-      ristApiKey, setRistApiKey,
-      ristServerHost, setRistServerHost,
-      flowHistoryTimeout, setFlowHistoryTimeout,
-      configError, configFile, reloadConfig, applyImportedConfig,
-    }}>
-      {children}
-    </SettingsContext.Provider>
-  );
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 };
 
 export const useSettings = () => {
-  const context = useContext(SettingsContext);
-  if (context === undefined) throw new Error('useSettings must be used within a SettingsProvider');
-  return context;
+  const ctx = useContext(SettingsContext);
+  if (ctx === undefined) throw new Error('useSettings must be used within a SettingsProvider');
+  return ctx;
 };
