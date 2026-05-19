@@ -1,102 +1,66 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Row, Col, Navbar, Nav, Button, Alert, Spinner, Card, Collapse } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Container, Row, Col, Alert, Button } from 'react-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { apiService } from '../services/api.service';
-import { StreamId } from '../types/api.types';
-import { PublisherCard } from '../components/publisher';
-import { RistFlowCard, RistFlowHistoryCard, AddReceiverDialog, ReceiverCard } from '../components/rist';
-import { SettingsDialog, SetupDialog } from '../components/dialogs';
+import { CreateReceiverPayload } from '../types';
 import { useRistStats } from '../hooks/useRistStats';
 import { useRistReceivers } from '../hooks/useRistReceivers';
-import { RefreshTimer } from '../components/ui';
+import { useSrtPublishers } from '../hooks/useSrtPublishers';
+import { AppNavbar, ConfigErrorBanner } from '../components/layout';
+import { ReceiversList, RistFlowsList, RistFlowHistoryList, AddReceiverDialog } from '../components/rist';
+import { SrtPublishersSection } from '../components/srt';
+import { SettingsDialog, SetupDialog } from '../components/dialogs';
 
+const SETUP_COMPLETE_KEY = 'setup-complete';
+const REFRESH_AFTER_CREATE_MS = 1200;
+
+/**
+ * The single dashboard view. Owns the data hooks for SRT + RIST and orchestrates
+ * the two-column layout — actual rendering is delegated to section components.
+ */
 export const PublishersPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { ristApiUrl, ristApiKey, ristServerHost, flowHistoryTimeout, developerMode, configError } = useSettings();
-  const [configErrorDismissed, setConfigErrorDismissed] = useState(false);
 
-  const resolvedServerHost = ristServerHost || (() => { try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; } })();
+  // Fallback to URL hostname when no explicit server host is configured —
+  // works when the API is on the same machine as the stream sender.
+  const resolvedServerHost = ristServerHost || (() => {
+    try { return new URL(ristApiUrl).hostname; } catch { return 'localhost'; }
+  })();
+  const ristApiConfigured = !!ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
 
-  // ── SRT state ──────────────────────────────────────────────────────────────
-  const [streamIds, setStreamIds] = useState<StreamId[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(() => !localStorage.getItem('setup-complete'));
-
-  // ── RIST state ─────────────────────────────────────────────────────────────
-  const ristApiConfigured = ristApiUrl && !ristApiUrl.startsWith('{{') && ristApiUrl.trim() !== '';
-
-  const { flows: ristFlows, historyFlows: ristHistoryFlows, loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer } =
-    useRistStats(ristApiConfigured ? ristApiUrl : '', ristApiKey, flowHistoryTimeout);
-  const { receivers, loading: receiversLoading, createReceiver, updateReceiver, deleteReceiver, startRelay, stopRelay, refresh: refreshReceivers } =
-    useRistReceivers(ristApiConfigured ? ristApiUrl : '', ristApiKey);
+  // Dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(() => !localStorage.getItem(SETUP_COMPLETE_KEY));
   const [addReceiverOpen, setAddReceiverOpen] = useState(false);
-  const [receiversExpanded, setReceiversExpanded] = useState(true);
 
-  // ── SRT helpers ────────────────────────────────────────────────────────────
-  const groupedStreamIds = React.useMemo(() => {
-    const groups: Record<string, StreamId[]> = {};
-    streamIds.forEach(s => {
-      if (!groups[s.publisher]) groups[s.publisher] = [];
-      groups[s.publisher].push(s);
-    });
-    return groups;
-  }, [streamIds]);
+  // Data hooks
+  const { streamIds, loading: srtLoading, error: srtError } = useSrtPublishers(isAuthenticated);
+  const ristStatsUrl = ristApiConfigured ? ristApiUrl : '';
+  const {
+    flows: ristFlows, historyFlows: ristHistoryFlows,
+    loading: ristLoading, error: ristError, secondsUntilUpdate: ristTimer,
+  } = useRistStats(ristStatsUrl, ristApiKey, flowHistoryTimeout);
+  const {
+    receivers, loading: receiversLoading,
+    createReceiver, updateReceiver, deleteReceiver,
+    startRelay, stopRelay, refresh: refreshReceivers,
+  } = useRistReceivers(ristStatsUrl, ristApiKey);
 
-  const fetchStreamIds = useCallback(async () => {
-    if (!isAuthenticated) { setLoading(false); return; }
-    try {
-      setError(null);
-      const data = await apiService.getStreamIds();
-      setStreamIds(data);
-    } catch (err: any) {
-      setError(err.response?.status === 401
-        ? 'Authentication failed. Please check your API key in settings.'
-        : 'Failed to fetch stream IDs. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => { fetchStreamIds(); }, [isAuthenticated, fetchStreamIds]);
-
-  const handleCreateReceiver = async (payload: any) => {
+  const handleCreateReceiver = async (payload: CreateReceiverPayload) => {
     await createReceiver(payload);
-    setTimeout(refreshReceivers, 1200);
+    // Receiver status flips from 'starting' to 'running' after the process
+    // signals 'spawn'. Refresh once so the badge reflects the final state.
+    setTimeout(refreshReceivers, REFRESH_AFTER_CREATE_MS);
   };
 
   return (
     <>
-      <Navbar className="navbar-dark sticky-top" expand="lg">
-        <Container fluid>
-          <Navbar.Brand href="#">
-            <i className="bi bi-broadcast me-2"></i>
-            RISTMonitor
-          </Navbar.Brand>
-          <Nav className="ms-auto">
-            <Button variant="link" className="nav-link" onClick={() => setSettingsDialogOpen(true)} title="Settings">
-              <i className="bi bi-gear"></i>
-            </Button>
-          </Nav>
-        </Container>
-      </Navbar>
+      <AppNavbar onOpenSettings={() => setSettingsOpen(true)} />
 
       <Container className="py-4">
-        {error && (
-          <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-3">{error}</Alert>
-        )}
-        {configError && !configErrorDismissed && (
-          <Alert variant="warning" dismissible onClose={() => setConfigErrorDismissed(true)} className="mb-3">
-            <i className="bi bi-shield-exclamation me-2"></i>
-            <strong>Konfiguration konnte nicht geladen werden:</strong> {configError}
-            <div className="small mt-1 text-muted">
-              Settings sind lokal verfügbar, aber wurden nicht vom Server geladen. Beim Neustart können Daten verloren gehen.
-            </div>
-          </Alert>
-        )}
+        {srtError && <Alert variant="danger" className="mb-3">{srtError}</Alert>}
+        <ConfigErrorBanner error={configError} />
 
         <Row className="mb-3 align-items-center">
           <Col>
@@ -106,7 +70,7 @@ export const PublishersPage: React.FC = () => {
         </Row>
 
         <Row className="g-4">
-          {/* ── RIST ── */}
+          {/* ── RIST column ──────────────────────────────────────────── */}
           <Col xs={12} lg={6}>
             {!ristApiConfigured && (
               <Alert variant="warning" className="d-flex align-items-center gap-3 mb-3">
@@ -115,135 +79,55 @@ export const PublishersPage: React.FC = () => {
                   <strong>RIST API URL required</strong>
                   <div className="small">Configure the URL of the RIST Stats Monitor API server in settings to manage receivers.</div>
                 </div>
-                <Button variant="warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
+                <Button variant="warning" size="sm" onClick={() => setSettingsOpen(true)}>
                   <i className="bi bi-gear me-1"></i>Settings
                 </Button>
               </Alert>
             )}
 
-            {/* Receivers */}
-            <div className="mb-3">
-              <div className="d-flex align-items-center justify-content-between mb-2">
-                <Button
-                  variant="link"
-                  className="p-0 text-decoration-none text-light d-flex align-items-center gap-2"
-                  onClick={() => setReceiversExpanded(!receiversExpanded)}
-                >
-                  <i className="bi bi-hdd-network text-info"></i>
-                  <span className="fw-semibold">RIST Receivers</span>
-                  <span className="badge bg-secondary">{receivers.length}</span>
-                  <i className={`bi bi-chevron-${receiversExpanded ? 'up' : 'down'} small`}></i>
-                </Button>
-                <Button variant="outline-info" size="sm" onClick={() => setAddReceiverOpen(true)} disabled={!ristApiConfigured}>
-                  <i className="bi bi-plus-lg me-1"></i>Add
-                </Button>
-              </div>
-              <Collapse in={receiversExpanded}>
-                <div>
-                  {receiversLoading ? (
-                    <div className="text-center py-2"><Spinner animation="border" size="sm" /></div>
-                  ) : receivers.length === 0 ? (
-                    <p className="text-muted small mb-0">No receivers running. Click Add to start one.</p>
-                  ) : (
-                    receivers.map(r => (
-                      <ReceiverCard
-                        key={r.id}
-                        receiver={r}
-                        serverHost={resolvedServerHost}
-                        developerMode={developerMode}
-                        onDelete={deleteReceiver}
-                        onUpdate={updateReceiver}
-                        onStartRelay={startRelay}
-                        onStopRelay={stopRelay}
-                      />
-                    ))
-                  )}
-                </div>
-              </Collapse>
-            </div>
+            <ReceiversList
+              receivers={receivers}
+              loading={receiversLoading}
+              apiConfigured={ristApiConfigured}
+              serverHost={resolvedServerHost}
+              developerMode={developerMode}
+              onAdd={() => setAddReceiverOpen(true)}
+              onDelete={deleteReceiver}
+              onUpdate={updateReceiver}
+              onStartRelay={startRelay}
+              onStopRelay={stopRelay}
+            />
 
-            {/* Flows */}
-            <div className="d-flex align-items-center justify-content-between mb-3">
-              <h5 className="mb-0"><i className="bi bi-diagram-3 me-2 text-info"></i>RIST Flows</h5>
-              {!ristLoading && !ristError && <RefreshTimer secondsUntilUpdate={ristTimer} />}
-            </div>
-
-            {ristLoading ? (
-              <div className="text-center py-5"><Spinner animation="border" role="status"><span className="visually-hidden">Loading…</span></Spinner></div>
-            ) : ristError ? (
-              <Alert variant="warning" className="mb-0">
-                <i className="bi bi-exclamation-triangle me-2"></i>{ristError}
-              </Alert>
-            ) : ristFlows.length === 0 ? (
-              <Card className="text-center">
-                <Card.Body className="py-4">
-                  <i className="bi bi-diagram-3 display-6 mb-2 d-block opacity-50"></i>
-                  <h6 className="mb-1">No active RIST flows</h6>
-                  <p className="text-muted small mb-0">Start a receiver above or configure your RIST API URL in Settings.</p>
-                </Card.Body>
-              </Card>
-            ) : (
-              <div>
-                {ristFlows.map(flow => <RistFlowCard key={`${flow.receiverId}-${flow.flowId}`} flow={flow} />)}
-              </div>
-            )}
+            <RistFlowsList
+              flows={ristFlows}
+              loading={ristLoading}
+              error={ristError}
+              secondsUntilUpdate={ristTimer}
+            />
           </Col>
 
-          {/* ── SRT + RIST History ── */}
+          {/* ── SRT column ───────────────────────────────────────────── */}
           <Col xs={12} lg={6}>
-            <div className="d-flex align-items-center mb-3">
-              <h5 className="mb-0"><i className="bi bi-broadcast me-2 text-primary"></i>SRT Publishers</h5>
-            </div>
-
-            {!isAuthenticated ? (
-              <Card className="text-center border-warning">
-                <Card.Body className="py-4">
-                  <i className="bi bi-key display-6 mb-2 d-block text-warning opacity-75"></i>
-                  <h6 className="mb-2">API key required</h6>
-                  <p className="text-muted small mb-3">Configure your SLS API key to monitor streams.</p>
-                  <Button variant="outline-warning" size="sm" onClick={() => setSettingsDialogOpen(true)}>
-                    <i className="bi bi-gear me-1"></i>Configure
-                  </Button>
-                </Card.Body>
-              </Card>
-            ) : loading ? (
-              <div className="text-center py-5"><Spinner animation="border" role="status"><span className="visually-hidden">Loading…</span></Spinner></div>
-            ) : streamIds.length === 0 ? (
-              <Card className="text-center">
-                <Card.Body className="py-4">
-                  <i className="bi bi-broadcast display-6 mb-2 d-block opacity-50"></i>
-                  <h6 className="mb-2">No active SRT streams</h6>
-                  <p className="text-muted small mb-0">Streams are configured on the server.</p>
-                </Card.Body>
-              </Card>
-            ) : (
-              <div>
-                {Object.entries(groupedStreamIds).map(([publisher, ids]) => (
-                  <PublisherCard key={publisher} publisherName={publisher} streamIds={ids} />
-                ))}
-              </div>
-            )}
-
-            {/* RIST Flow History */}
-            {ristHistoryFlows.length > 0 && (
-              <div className="mt-4">
-                <h6 className="text-muted mb-2 d-flex align-items-center gap-2">
-                  <i className="bi bi-clock-history"></i>
-                  RIST Flow History
-                  <span className="badge bg-secondary">{ristHistoryFlows.length}</span>
-                </h6>
-                {ristHistoryFlows.map(flow => (
-                  <RistFlowHistoryCard key={`${flow.receiverId}-${flow.flowId}-${flow.disappearedAt}`} flow={flow} />
-                ))}
-              </div>
-            )}
+            <SrtPublishersSection
+              isAuthenticated={isAuthenticated}
+              streamIds={streamIds}
+              loading={srtLoading}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+            <RistFlowHistoryList flows={ristHistoryFlows} />
           </Col>
         </Row>
       </Container>
 
-      <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
-      <AddReceiverDialog open={addReceiverOpen} onClose={() => setAddReceiverOpen(false)} onCreate={handleCreateReceiver} apiKey={ristApiKey} defaultOutputHost={resolvedServerHost} />
+      <AddReceiverDialog
+        open={addReceiverOpen}
+        onClose={() => setAddReceiverOpen(false)}
+        onCreate={handleCreateReceiver}
+        apiKey={ristApiKey}
+        defaultOutputHost={resolvedServerHost}
+      />
     </>
   );
 };
