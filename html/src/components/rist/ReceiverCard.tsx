@@ -9,6 +9,7 @@ import { SrtRelayPanel } from './SrtRelayPanel';
 import { ReceiverLogsPanel } from './ReceiverLogsPanel';
 import { ReceiverActions } from './ReceiverActions';
 import { EditReceiverDialog } from './EditReceiverDialog';
+import { buildNoalbsStatsUrl } from '../../utils/streamUrls';
 
 interface ReceiverCardProps {
   receiver: RistReceiver;
@@ -33,8 +34,9 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({
   receiver, serverHost, developerMode,
   onDelete, onUpdate, onStartRelay, onStopRelay,
 }) => {
-  const { showQrCodes } = useSettings();
+  const { showQrCodes, ristApiUrl } = useSettings();
   const host = serverHost || 'localhost';
+  const statsUrl = buildNoalbsStatsUrl(ristApiUrl, host, receiver.id);
 
   const [editOpen, setEditOpen] = useState(false);
   const [startFormOpen, setStartFormOpen] = useState(false);
@@ -81,6 +83,8 @@ export const ReceiverCard: React.FC<ReceiverCardProps> = ({
               host={host}
               relay={receiver.relay}
               showQrCodes={showQrCodes}
+              statsUrl={statsUrl}
+              receiverName={receiver.name}
               startFormOpen={startFormOpen}
               onCloseStartForm={() => setStartFormOpen(false)}
               onStartRelay={handleStartRelay}

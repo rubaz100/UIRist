@@ -8,6 +8,8 @@ interface CopyButtonProps {
   /** How long to show the "Copied!" feedback. Default 1500ms. */
   feedbackMs?: number;
   className?: string;
+  /** Tooltip label shown before click. Defaults to "Copy". Use to distinguish multiple copy buttons on the same row. */
+  label?: string;
 }
 
 /**
@@ -15,7 +17,7 @@ interface CopyButtonProps {
  * "show/hide" toggle in the surrounding component, so users can copy secrets
  * without ever revealing them on screen.
  */
-export const CopyButton: React.FC<CopyButtonProps> = ({ text, feedbackMs = 1500, className }) => {
+export const CopyButton: React.FC<CopyButtonProps> = ({ text, feedbackMs = 1500, className, label = 'Copy' }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -26,7 +28,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({ text, feedbackMs = 1500,
   };
 
   return (
-    <OverlayTrigger placement="top" overlay={<Tooltip>{copied ? 'Copied!' : 'Copy'}</Tooltip>}>
+    <OverlayTrigger placement="top" overlay={<Tooltip>{copied ? 'Copied!' : label}</Tooltip>}>
       <Button
         variant="link"
         size="sm"

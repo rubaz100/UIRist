@@ -46,3 +46,25 @@ export function buildSrtObsUrlMasked({ host, port, passphrase }: SrtUrlOptions):
     ? `${base}?passphrase=${MASK}&latency=${OBS_LATENCY_US}`
     : `${base}?latency=${OBS_LATENCY_US}`;
 }
+
+/**
+ * NOALBS OpenIRL stats URL. Auto-derived from the public RIST server host + the
+ * API port (parsed from the API base URL the UI talks to). The path uses
+ * `play_<id>` with dashes stripped to match the conventional OpenIRL format.
+ *
+ *   http://ingest.example.com:3001/stats/play_ead95cd40bc344ff8d5a4ac7f3e58028
+ */
+export function buildNoalbsStatsUrl(apiUrl: string, publicHost: string, receiverId: string): string {
+  let scheme = 'http';
+  let port = '3001';
+  try {
+    const parsed = new URL(apiUrl);
+    scheme = parsed.protocol.replace(':', '') || 'http';
+    port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+  } catch {
+    // fall through to defaults
+  }
+  const host = publicHost && publicHost.trim() ? publicHost.trim() : 'localhost';
+  const streamKey = receiverId.replace(/-/g, '');
+  return `${scheme}://${host}:${port}/stats/play_${streamKey}`;
+}

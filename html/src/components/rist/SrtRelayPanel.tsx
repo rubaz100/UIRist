@@ -20,15 +20,33 @@ interface SrtRelayDisplayProps {
   host: string;
   relay: RistRelay;
   showQrCodes: boolean;
+  statsUrl?: string;
+  receiverName: string;
 }
 
-const SrtRelayDisplay: React.FC<SrtRelayDisplayProps> = ({ host, relay, showQrCodes }) => {
+function buildNoalbsStreamServerConfig(statsUrl: string, receiverName: string): string {
+  return JSON.stringify(
+    {
+      streamServer: { type: 'OpenIRL', statsUrl },
+      name: receiverName,
+      priority: 0,
+      overrideScenes: null,
+      dependsOn: null,
+      enabled: true,
+    },
+    null,
+    2,
+  );
+}
+
+const SrtRelayDisplay: React.FC<SrtRelayDisplayProps> = ({ host, relay, showQrCodes, statsUrl, receiverName }) => {
   const [passphraseVisible, setPassphraseVisible] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
   const opts = { host, port: relay.srtPort, passphrase: relay.passphrase };
   const url = buildSrtObsUrl(opts);
   const masked = buildSrtObsUrlMasked(opts);
+  const noalbsConfig = statsUrl ? buildNoalbsStreamServerConfig(statsUrl, receiverName) : '';
 
   return (
     <div
@@ -75,6 +93,17 @@ const SrtRelayDisplay: React.FC<SrtRelayDisplayProps> = ({ host, relay, showQrCo
       <div className="text-muted mt-1" style={{ paddingLeft: 44, fontSize: '0.68rem' }}>
         Input Format: <code>mpegts</code>
       </div>
+
+      {statsUrl && (
+        <div className="d-flex align-items-center gap-1 flex-wrap mt-1 pt-1" style={{ borderTop: '1px dashed rgba(25,135,84,0.2)' }}>
+          <span className="text-muted" style={{ minWidth: 40 }}>
+            <i className="bi bi-graph-up me-1"></i>Stats
+          </span>
+          <code className="text-info" style={{ wordBreak: 'break-all' }}>{statsUrl}</code>
+          <CopyButton text={statsUrl} label="Copy stats URL" />
+          <CopyButton text={noalbsConfig} label="Copy NOALBS streamServer config" />
+        </div>
+      )}
 
       {showQrCodes && <QrCollapse open={qrOpen} value={url} />}
     </div>
@@ -151,6 +180,9 @@ interface SrtRelayPanelProps {
   host: string;
   relay: RistRelay | null;
   showQrCodes: boolean;
+  /** Optional stats URL for an external NOALBS instance to poll. Stored on the receiver. */
+  statsUrl?: string;
+  receiverName: string;
   /** True while the form is open and no relay is running. Controlled by parent
    *  so the parent's action button can toggle it. */
   startFormOpen: boolean;
@@ -159,7 +191,7 @@ interface SrtRelayPanelProps {
 }
 
 export const SrtRelayPanel: React.FC<SrtRelayPanelProps> = ({
-  host, relay, showQrCodes, startFormOpen, onCloseStartForm, onStartRelay,
+  host, relay, showQrCodes, statsUrl, receiverName, startFormOpen, onCloseStartForm, onStartRelay,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -176,7 +208,15 @@ export const SrtRelayPanel: React.FC<SrtRelayPanelProps> = ({
   };
 
   if (relay) {
-    return <SrtRelayDisplay host={host} relay={relay} showQrCodes={showQrCodes} />;
+    return (
+      <SrtRelayDisplay
+        host={host}
+        relay={relay}
+        showQrCodes={showQrCodes}
+        statsUrl={statsUrl}
+        receiverName={receiverName}
+      />
+    );
   }
   if (startFormOpen) {
     return <SrtRelayStartForm loading={loading} onStart={handleStart} onCancel={onCloseStartForm} />;
